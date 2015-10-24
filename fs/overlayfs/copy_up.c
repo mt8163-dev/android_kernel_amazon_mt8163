@@ -48,7 +48,11 @@ int ovl_copy_xattr(struct dentry *old, struct dentry *new)
 	}
 
 	for (name = buf; name < (buf + list_size); name += strlen(name) + 1) {
-		size = vfs_getxattr(old, name, value, XATTR_SIZE_MAX);
+retry:
+		size = vfs_getxattr(old, name, value, value_size);
+		if (size == -ERANGE)
+			size = vfs_getxattr(old, name, NULL, 0);
+
 		if (size < 0) {
 			error = size;
 			break;
@@ -67,13 +71,6 @@ int ovl_copy_xattr(struct dentry *old, struct dentry *new)
 			goto retry;
 		}
 
-		error = security_inode_copy_up_xattr(name);
-		if (error < 0 && error != -EOPNOTSUPP)
-			break;
-		if (error == 1) {
-			error = 0;
-			continue; /* Discard */
-		}
 		error = vfs_setxattr(new, name, value, size, 0);
 		if (error)
 			break;
