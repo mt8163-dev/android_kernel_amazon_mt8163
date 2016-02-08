@@ -413,7 +413,8 @@ static void snd_timer_notify1(struct snd_timer_instance *ti, int event)
 		return;
 	list_for_each_entry(ts, &ti->slave_active_head, active_list)
 		if (ts->ccallback)
-			ts->ccallback(ti, event + 100, &tstamp, resolution);
+			ts->ccallback(ts, event + 100, &tstamp, resolution);
+	spin_unlock_irqrestore(&timer->lock, flags);
 }
 
 /* start/continue a master timer */
