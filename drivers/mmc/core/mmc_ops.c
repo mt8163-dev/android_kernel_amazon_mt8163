@@ -568,9 +568,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 		timeout_ms = MMC_OPS_TIMEOUT_MS;
 
 	/* Must check status to be sure of no errors. */
-	/* Sync mtk patch: fix switch timeout issue caused by jiffies precision */
-	/* Enlarge timeout value to 100ms for stuck issue caused by Hynix eMMC */
-	timeout = jiffies + msecs_to_jiffies(timeout_ms) + 10;
+	timeout = jiffies + msecs_to_jiffies(timeout_ms) + 1;
 	do {
 		if (send_status) {
 			/*
