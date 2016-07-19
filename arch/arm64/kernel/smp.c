@@ -193,7 +193,10 @@ asmlinkage void secondary_start_kernel(void)
 	set_cpu_online(cpu, true);
 	complete(&cpu_running);
 
-	local_dbg_enable();
+	aee_rr_rec_hoplug(cpu, 13, 0);
+
+	aee_rr_rec_hoplug(cpu, 14, 0);
+
 	local_irq_enable();
 	local_async_enable();
 
