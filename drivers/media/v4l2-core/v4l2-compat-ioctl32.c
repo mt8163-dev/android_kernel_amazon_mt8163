@@ -129,7 +129,7 @@ static int put_v4l2_window32(struct v4l2_window __user *kp,
 			     struct v4l2_window32 __user *up)
 >>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
-	struct v4l2_clip __user *kclips = kp->clips;
+	struct v4l2_clip __user *kclips;
 	struct v4l2_clip32 __user *uclips;
 	compat_caddr_t p;
 	u32 clipcount;
@@ -144,6 +144,8 @@ static int put_v4l2_window32(struct v4l2_window __user *kp,
 	if (!clipcount)
 		return 0;
 
+	if (get_user(kclips, &kp->clips))
+		return -EFAULT;
 	if (get_user(p, &up->clips))
 		return -EFAULT;
 	uclips = compat_ptr(p);
