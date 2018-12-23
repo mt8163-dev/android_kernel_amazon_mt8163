@@ -55,12 +55,20 @@
 #include "f_ecm.c"
 #include "f_eem.c"
 #include "u_ether.c"
-
-//#define CONFIG_MTK_C2K_SUPPORT
-#ifdef CONFIG_MTK_C2K_SUPPORT
-#include "viatel_rawbulk.h"
-int rawbulk_bind_config(struct usb_configuration *c, int transfer_id);
-int rawbulk_function_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl);
+#include "u_qc_ether.c"
+#ifdef CONFIG_TARGET_CORE
+#include "f_tcm.c"
+#endif
+#ifdef CONFIG_SND_PCM
+#include "u_uac1.c"
+#include "f_uac1.c"
+#endif
+#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+#include "f_ncm.c"
+#endif
+#include "f_midi.c"
+#ifdef CONFIG_USB_LOCK_SUPPORT_FOR_MDM
+#include <linux/power_supply.h>
 #endif
 
 MODULE_AUTHOR("Mike Lockwood");
@@ -74,25 +82,13 @@ static const char longname[] = "Gadget Android";
 #define VENDOR_ID		0x0BB4
 #define PRODUCT_ID		0x0001
 
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-#include <mt-plat/mt_boot_common.h>
-#define KPOC_USB_FUNC "mtp"
-#define KPOC_USB_VENDOR_ID 0x0E8D
-#define KPOC_USB_PRODUCT_ID 0x2008
-#endif
-
 /* f_midi configuration */
 #define MIDI_INPUT_PORTS    1
 #define MIDI_OUTPUT_PORTS   1
-#define MIDI_BUFFER_SIZE    512
+#define MIDI_BUFFER_SIZE    256
 #define MIDI_QUEUE_LENGTH   32
 
-/* Default manufacturer and product string , overridden by userspace */
-#define MANUFACTURER_STRING "MediaTek"
-#define PRODUCT_STRING "MT65xx Android Phone"
-
-
-//#define USB_LOG "USB"
+#define ANDROID_DEVICE_NODE_NAME_LENGTH 11
 
 struct android_usb_function {
 	char *name;
@@ -1737,9 +1733,61 @@ static struct android_usb_function audio_source_function = {
 	.attributes	= audio_source_function_attributes,
 };
 
-#ifdef CONFIG_MTK_C2K_SUPPORT
-static int rawbulk_function_init(struct android_usb_function *f,
-					struct usb_composite_dev *cdev)
+static int midi_function_init(struct android_usb_function *f,
+                              struct usb_composite_dev *cdev)
+{
+	struct midi_alsa_config *config;
+
+	config = kzalloc(sizeof(struct midi_alsa_config), GFP_KERNEL);
+	f->config = config;
+	if (!config)
+		return -ENOMEM;
+	config->card = -1;
+	config->device = -1;
+	return 0;
+}
+
+static void midi_function_cleanup(struct android_usb_function *f)
+{
+	kfree(f->config);
+}
+
+static int midi_function_bind_config(struct android_usb_function *f,
+                                     struct usb_configuration *c)
+{
+	struct midi_alsa_config *config = f->config;
+
+	return f_midi_bind_config(c, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1,
+			MIDI_INPUT_PORTS, MIDI_OUTPUT_PORTS, MIDI_BUFFER_SIZE,
+			MIDI_QUEUE_LENGTH, config);
+}
+
+static ssize_t midi_alsa_show(struct device *dev,
+                              struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct midi_alsa_config *config = f->config;
+
+	/* print ALSA card and device numbers */
+	return sprintf(buf, "%d %d\n", config->card, config->device);
+}
+
+static DEVICE_ATTR(alsa, S_IRUGO, midi_alsa_show, NULL);
+
+static struct device_attribute *midi_function_attributes[] = {
+	&dev_attr_alsa,
+	NULL
+};
+
+static struct android_usb_function midi_function = {
+	.name		= "midi",
+	.init		= midi_function_init,
+	.cleanup	= midi_function_cleanup,
+	.bind_config	= midi_function_bind_config,
+	.attributes	= midi_function_attributes,
+};
+
+static int android_uasp_connect_cb(bool connect)
 {
 	return 0;
 }
@@ -1900,6 +1948,8 @@ static struct android_usb_function *supported_functions[] = {
 #ifdef CONFIG_USB_F_LOOPBACK
 	&loopback_function,
 #endif
+	&uasp_function,
+	&midi_function,
 	NULL
 };
 

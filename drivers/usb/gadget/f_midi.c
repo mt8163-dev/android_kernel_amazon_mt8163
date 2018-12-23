@@ -101,30 +101,8 @@ DECLARE_UAC_AC_HEADER_DESCRIPTOR(1);
 DECLARE_USB_MIDI_OUT_JACK_DESCRIPTOR(1);
 DECLARE_USB_MS_ENDPOINT_DESCRIPTOR(16);
 
-/* B.3.1  Standard AC Interface Descriptor */
-static struct usb_interface_descriptor ac_interface_desc /* __initdata */ = {
-	.bLength =		USB_DT_INTERFACE_SIZE,
-	.bDescriptorType =	USB_DT_INTERFACE,
-	/* .bInterfaceNumber =	DYNAMIC */
-	/* .bNumEndpoints =	DYNAMIC */
-	.bInterfaceClass =	USB_CLASS_AUDIO,
-	.bInterfaceSubClass =	USB_SUBCLASS_AUDIOCONTROL,
-	/* .iInterface =	DYNAMIC */
-};
-
-/* B.3.2  Class-Specific AC Interface Descriptor */
-static struct uac1_ac_header_descriptor_1 ac_header_desc /* __initdata */ = {
-	.bLength =		UAC_DT_AC_HEADER_SIZE(1),
-	.bDescriptorType =	USB_DT_CS_INTERFACE,
-	.bDescriptorSubtype =	USB_MS_HEADER,
-	.bcdADC =		cpu_to_le16(0x0100),
-	.wTotalLength =		cpu_to_le16(UAC_DT_AC_HEADER_SIZE(1)),
-	.bInCollection =	1,
-	/* .baInterfaceNr =	DYNAMIC */
-};
-
 /* B.4.1  Standard MS Interface Descriptor */
-static struct usb_interface_descriptor ms_interface_desc /* __initdata */ = {
+static struct usb_interface_descriptor ms_interface_desc /*__initdata*/ = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
 	.bDescriptorType =	USB_DT_INTERFACE,
 	/* .bInterfaceNumber =	DYNAMIC */
@@ -135,7 +113,7 @@ static struct usb_interface_descriptor ms_interface_desc /* __initdata */ = {
 };
 
 /* B.4.2  Class-Specific MS Interface Descriptor */
-static struct usb_ms_header_descriptor ms_header_desc /* __initdata */ = {
+static struct usb_ms_header_descriptor ms_header_desc /*__initdata*/ = {
 	.bLength =		USB_DT_MS_HEADER_SIZE,
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype =	USB_MS_HEADER,
@@ -196,7 +174,7 @@ static struct usb_gadget_strings *midi_strings[] = {
 	NULL,
 };
 
-static struct usb_request *alloc_ep_req(struct usb_ep *ep, unsigned length)
+static struct usb_request *midi_alloc_ep_req(struct usb_ep *ep, unsigned length)
 {
 	struct usb_request *req;
 
@@ -212,7 +190,7 @@ static struct usb_request *alloc_ep_req(struct usb_ep *ep, unsigned length)
 	return req;
 }
 
-static void free_ep_req(struct usb_ep *ep, struct usb_request *req)
+static void midi_free_ep_req(struct usb_ep *ep, struct usb_request *req)
 {
 	kfree(req->buf);
 	usb_ep_free_request(ep, req);
@@ -258,7 +236,6 @@ static void
 f_midi_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_midi *midi = ep->driver_data;
-	struct usb_composite_dev *cdev = midi->func.config->cdev;
 	int status = req->status;
 
 	switch (status) {
@@ -278,19 +255,19 @@ f_midi_complete(struct usb_ep *ep, struct usb_request *req)
 	case -ECONNABORTED:	/* hardware forced ep reset */
 	case -ECONNRESET:	/* request dequeued */
 	case -ESHUTDOWN:	/* disconnect from host */
-		VDBG(cdev, "%s gone (%d), %d/%d\n", ep->name, status,
+		VDBG(midi->func.config->cdev, "%s gone (%d), %d/%d\n", ep->name, status,
 				req->actual, req->length);
 		if (ep == midi->out_ep)
 			f_midi_handle_out_data(ep, req);
 
-		free_ep_req(ep, req);
+		midi_free_ep_req(ep, req);
 		return;
 
 	case -EOVERFLOW:	/* buffer overrun on read means that
 				 * we didn't provide a big enough buffer.
 				 */
 	default:
-		DBG(cdev, "%s complete --> %d, %d/%d\n", ep->name,
+		DBG(midi->func.config->cdev, "%s complete --> %d, %d/%d\n", ep->name,
 				status, req->actual, req->length);
 		break;
 	case -EREMOTEIO:	/* short read */
@@ -299,8 +276,8 @@ f_midi_complete(struct usb_ep *ep, struct usb_request *req)
 
 	status = usb_ep_queue(ep, req, GFP_ATOMIC);
 	if (status) {
-		ERROR(cdev, "kill %s:  resubmit %d bytes --> %d\n",
-				ep->name, req->length, status);
+		pr_err("%s: kill %s:  resubmit %d bytes --> %d\n",
+				__func__, ep->name, req->length, status);
 		usb_ep_set_halt(ep);
 		/* FIXME recover later ... somehow */
 	}
@@ -311,20 +288,19 @@ static int f_midi_start_ep(struct f_midi *midi,
 			   struct usb_ep *ep)
 {
 	int err;
-	struct usb_composite_dev *cdev = f->config->cdev;
 
 	if (ep->driver_data)
 		usb_ep_disable(ep);
 
 	err = config_ep_by_speed(midi->gadget, f, ep);
 	if (err) {
-		ERROR(cdev, "can't configure %s: %d\n", ep->name, err);
+		pr_err("%s: can't configure %s: %d\n", __func__, ep->name, err);
 		return err;
 	}
 
 	err = usb_ep_enable(ep);
 	if (err) {
-		ERROR(cdev, "can't start %s: %d\n", ep->name, err);
+		pr_err("%s: can't start %s: %d\n", __func__, ep->name, err);
 		return err;
 	}
 
@@ -336,7 +312,6 @@ static int f_midi_start_ep(struct f_midi *midi,
 static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct f_midi *midi = func_to_midi(f);
-	struct usb_composite_dev *cdev = f->config->cdev;
 	unsigned i;
 	int err;
 
@@ -353,15 +328,13 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	err = config_ep_by_speed(midi->gadget, f, midi->out_ep);
 	if (err) {
-		ERROR(cdev, "can't configure %s: %d\n",
-		      midi->out_ep->name, err);
+		pr_err("%s: can't configure %s: %d\n", __func__, midi->out_ep->name, err);
 		return err;
 	}
 
 	err = usb_ep_enable(midi->out_ep);
 	if (err) {
-		ERROR(cdev, "can't start %s: %d\n",
-		      midi->out_ep->name, err);
+		pr_err("%s: can't start %s: %d\n", __func__, midi->out_ep->name, err);
 		return err;
 	}
 
@@ -370,15 +343,14 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* allocate a bunch of read buffers and queue them all at once. */
 	for (i = 0; i < midi->qlen && err == 0; i++) {
 		struct usb_request *req =
-			alloc_ep_req(midi->out_ep, midi->buflen);
+			midi_alloc_ep_req(midi->out_ep, midi->buflen);
 		if (req == NULL)
 			return -ENOMEM;
 
 		req->complete = f_midi_complete;
 		err = usb_ep_queue(midi->out_ep, req, GFP_ATOMIC);
 		if (err) {
-			ERROR(midi, "%s queue req: %d\n",
-				    midi->out_ep->name, err);
+			pr_err("%s: %s queue req: %d\n", __func__, midi->out_ep->name, err);
 		}
 	}
 
@@ -388,9 +360,8 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 static void f_midi_disable(struct usb_function *f)
 {
 	struct f_midi *midi = func_to_midi(f);
-	struct usb_composite_dev *cdev = f->config->cdev;
 
-	DBG(cdev, "disable\n");
+	DBG(f->config->cdev, "disable\n");
 
 	/*
 	 * just disable endpoints, forcing completion of pending i/o.
@@ -402,11 +373,10 @@ static void f_midi_disable(struct usb_function *f)
 
 static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
 {
-	struct usb_composite_dev *cdev = f->config->cdev;
 	struct f_midi *midi = func_to_midi(f);
 	struct snd_card *card;
 
-	DBG(cdev, "unbind\n");
+	DBG(f->config->cdev, "unbind\n");
 
 	/* just to be sure */
 	f_midi_disable(f);
@@ -551,10 +521,10 @@ static void f_midi_transmit(struct f_midi *midi, struct usb_request *req)
 		return;
 
 	if (!req)
-		req = alloc_ep_req(ep, midi->buflen);
+		req = midi_alloc_ep_req(ep, midi->buflen);
 
 	if (!req) {
-		ERROR(midi, "gmidi_transmit: alloc_ep_request failed\n");
+		pr_err("%s: gmidi_transmit: midi_alloc_ep_request failed\n", __func__);
 		return;
 	}
 	req->length = 0;
@@ -580,7 +550,7 @@ static void f_midi_transmit(struct f_midi *midi, struct usb_request *req)
 	if (req->length > 0)
 		usb_ep_queue(ep, req, GFP_ATOMIC);
 	else
-		free_ep_req(ep, req);
+		midi_free_ep_req(ep, req);
 }
 
 static void f_midi_in_tasklet(unsigned long data)
@@ -604,9 +574,7 @@ static int f_midi_in_open(struct snd_rawmidi_substream *substream)
 
 static int f_midi_in_close(struct snd_rawmidi_substream *substream)
 {
-	struct f_midi *midi = substream->rmidi->private_data;
-
-	VDBG(midi, "%s()\n", __func__);
+	VDBG(substream->rmidi->private_data, "%s()\n", __func__);
 	return 0;
 }
 
@@ -637,9 +605,7 @@ static int f_midi_out_open(struct snd_rawmidi_substream *substream)
 
 static int f_midi_out_close(struct snd_rawmidi_substream *substream)
 {
-	struct f_midi *midi = substream->rmidi->private_data;
-
-	VDBG(midi, "%s()\n", __func__);
+	VDBG(substream->rmidi->private_data, "%s()\n", __func__);
 	return 0;
 }
 
@@ -680,14 +646,14 @@ static int f_midi_register_card(struct f_midi *midi)
 	err = snd_card_new(&midi->gadget->dev, midi->index, midi->id,
 			THIS_MODULE, 0, &card);
 	if (err < 0) {
-		ERROR(midi, "snd_card_new() failed\n");
+		pr_err("%s: snd_card_create() failed\n", __func__);
 		goto fail;
 	}
 	midi->card = card;
 
 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, midi, &ops);
 	if (err < 0) {
-		ERROR(midi, "snd_device_new() failed: error %d\n", err);
+		pr_err("%s: snd_device_new() failed: error %d\n", __func__, err);
 		goto fail;
 	}
 
@@ -700,7 +666,7 @@ static int f_midi_register_card(struct f_midi *midi)
 	err = snd_rawmidi_new(card, card->longname, 0,
 			      midi->out_ports, midi->in_ports, &rmidi);
 	if (err < 0) {
-		ERROR(midi, "snd_rawmidi_new() failed: error %d\n", err);
+		pr_err("%s: snd_rawmidi_new() failed: error %d\n", __func__, err);
 		goto fail;
 	}
 	midi->rmidi = rmidi;
@@ -722,7 +688,7 @@ static int f_midi_register_card(struct f_midi *midi)
 	/* register it - we're ready to go */
 	err = snd_card_register(card);
 	if (err < 0) {
-		ERROR(midi, "snd_card_register() failed\n");
+		pr_err("%s: snd_card_register() failed\n", __func__);
 		goto fail;
 	}
 
@@ -739,7 +705,7 @@ fail:
 
 /* MIDI function driver setup/binding */
 
-static int /* __init */
+static int /*__init*/
 f_midi_bind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_descriptor_header **midi_function;
@@ -913,7 +879,7 @@ fail:
 	if (midi->in_ep)
 		midi->in_ep->driver_data = NULL;
 
-	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
+	pr_err("%s: %s: can't bind, err %d\n", __func__, f->name, status);
 
 	return status;
 }
@@ -929,7 +895,7 @@ fail:
  *
  * Returns zero on success, else negative errno.
  */
-int /* __init */ f_midi_bind_config(struct usb_configuration *c,
+int /*__init*/ f_midi_bind_config(struct usb_configuration *c,
 			      int index, char *id,
 			      unsigned int in_ports,
 			      unsigned int out_ports,
@@ -993,7 +959,6 @@ int /* __init */ f_midi_bind_config(struct usb_configuration *c,
 	status = usb_add_function(c, &midi->func);
 	if (status)
 		goto setup_fail;
-
 
 	if (config) {
 		config->card = midi->rmidi->card->number;
