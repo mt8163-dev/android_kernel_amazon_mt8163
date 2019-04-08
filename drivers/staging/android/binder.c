@@ -122,17 +122,6 @@ char large_msg[TRANS_LOG_LEN];
 #define BINDER_PERF_EVAL		"V0.1"
 #endif
 
-#ifdef BINDER_PERF_EVAL
-/* binder_perf_evalue bitmap
- * bit: ...3210
- *           ||_ 1: send counter enable
- *           |__ 1: timeout counter enable
- */
-static unsigned int binder_perf_evalue;
-#define BINDER_PERF_SEND_COUNTER	0x1
-#define BINDER_PERF_TIMEOUT_COUNTER	0x2
-#endif
-
 #define BINDER_DEBUG_ENTRY(name) \
 static int binder_##name##_open(struct inode *inode, struct file *file) \
 { \
@@ -449,6 +438,7 @@ struct binder_buffer {
 };
 
 enum binder_deferred_state {
+	BINDER_DEFERRED_PUT_FILES	= 0x01,
 	BINDER_DEFERRED_FLUSH		= 0x01,
 	BINDER_DEFERRED_RELEASE		= 0x02,
 };
@@ -459,22 +449,6 @@ enum wait_on_reason {
 	WAIT_ON_READ = 1U,
 	WAIT_ON_EXEC = 2U,
 	WAIT_ON_REPLY_READ = 3U
-};
-#endif
-
-#ifdef BINDER_PERF_EVAL
-#define BC_CODE_NR 60
-#define BC_STATS_NR 30
-struct binder_bc_stats {
-	char service[MAX_SERVICE_NAME_LEN];
-	unsigned int code[BC_CODE_NR];
-	unsigned int code_num[BC_CODE_NR];
-};
-struct binder_timeout_stats {
-	unsigned long bto[WAIT_ON_REPLY_READ];
-	struct timespec read_t[32];
-	struct timespec exec_t[32];
-	struct timespec rrply_t[32];
 };
 #endif
 
@@ -518,11 +492,6 @@ struct binder_proc {
 #ifdef BINDER_MONITOR
 	struct binder_buffer *large_buffer;
 #endif
-#ifdef BINDER_PERF_EVAL
-	int bc_t;
-	struct binder_bc_stats *bc_stats[BC_STATS_NR];
-	struct binder_timeout_stats to_stats;
-#endif
 #ifdef MTK_BINDER_PAGE_USED_RECORD
 	unsigned int page_used;
 	unsigned int page_used_peak;
@@ -551,10 +520,6 @@ struct binder_thread {
 	/* we are also waiting on */
 	wait_queue_head_t wait;
 	struct binder_stats stats;
-#ifdef BINDER_PERF_EVAL
-	struct binder_timeout_stats to_stats;
-#endif
-
 };
 
 struct binder_transaction {
@@ -686,55 +651,6 @@ static void binder_print_bwdog(struct binder_transaction *t,
 	startime = (r == WAIT_ON_EXEC) ? &t->exe_timestamp : &t->timestamp;
 	sub_t = timespec_sub(cur, *startime);
 
-#ifdef BINDER_PERF_EVAL
-	if (!(cur_in && e)
-	    && (binder_perf_evalue & BINDER_PERF_TIMEOUT_COUNTER)) {
-		switch (r) {
-		case WAIT_ON_READ:
-			{
-				if (t->to_proc) {
-					unsigned long proc_t = t->to_proc->to_stats.bto[r - 1]++;
-
-					t->to_proc->to_stats.read_t[(proc_t % 32)] = sub_t;
-				}
-				break;
-			}
-		case WAIT_ON_EXEC:
-			{
-				if (t->to_proc) {
-					unsigned long proc_t = t->to_proc->to_stats.bto[r - 1]++;
-
-					t->to_proc->to_stats.exec_t[(proc_t % 32)] = sub_t;
-				}
-				if (t->to_thread) {
-					unsigned long thread_t =
-					    t->to_thread->to_stats.bto[r - 1]++;
-					t->to_thread->to_stats.exec_t[(thread_t % 32)] = sub_t;
-				}
-				break;
-			}
-		case WAIT_ON_REPLY_READ:
-			{
-				if (t->to_proc) {
-					unsigned long proc_t = t->to_proc->to_stats.bto[r - 1]++;
-
-					t->to_proc->to_stats.rrply_t[(proc_t % 32)] = sub_t;
-				}
-				if (t->to_thread) {
-					unsigned long thread_t =
-					    t->to_thread->to_stats.bto[r - 1]++;
-					t->to_thread->to_stats.rrply_t[(thread_t % 32)] = sub_t;
-				}
-
-				break;
-			}
-		case WAIT_ON_NONE:
-			break;
-		default:
-			break;
-		}
-	}
-#endif
 	rtc_time_to_tm(t->tv.tv_sec, &tm);
 	pr_debug("%d %s %d:%d to %d:%d %s %u.%03ld sec (%s) dex_code %u",
 		 t->debug_id, binder_wait_on_str[r],
@@ -1168,7 +1084,7 @@ static void binder_print_buf(struct binder_buffer *buffer, char *dest, int succe
 	}
 	pr_debug("%s", str);
 	if (dest != NULL)
-		strncat(dest, str, sizeof(str));
+		strncat(dest, str, sizeof(str) - strlen(dest) - 1);
 }
 
 /**
@@ -1202,7 +1118,9 @@ static void binder_check_buf(struct binder_proc *target_proc, size_t size, int i
 	struct timespec exp_timestamp;
 	struct timeval tv;
 	struct rtc_time tm;
+#if defined(CONFIG_MTK_AEE_FEATURE)
 	int db_flag = DB_OPT_BINDER_INFO;
+#endif
 	int len_s, len_r;
 	int ptr = 0;
 
@@ -2128,8 +2046,8 @@ static int binder_dec_node(struct binder_node *node, int strong, int internal)
 	return 0;
 }
 
-static struct binder_ref *binder_get_ref(struct binder_proc *proc, uint32_t desc,
-                                         bool need_strong_ref)
+static struct binder_ref *binder_get_ref(struct binder_proc *proc,
+					uint32_t desc, bool need_strong_ref)
 {
 	struct rb_node *n = proc->refs_by_desc.rb_node;
 	struct binder_ref *ref;
@@ -2411,7 +2329,7 @@ static void binder_transaction_buffer_release(struct binder_proc *proc,
 		case BINDER_TYPE_HANDLE:
 		case BINDER_TYPE_WEAK_HANDLE:{
 				struct binder_ref *ref = binder_get_ref(proc, fp->handle,
-                                                        fp->type == BINDER_TYPE_HANDLE);
+							fp->type == BINDER_TYPE_HANDLE);
 
 				if (ref == NULL) {
 					pr_err
@@ -2760,56 +2678,6 @@ static void binder_transaction(struct binder_proc *proc,
 	t->debug_id = ++binder_last_id;
 	e->debug_id = t->debug_id;
 
-#ifdef BINDER_PERF_EVAL
-	if (!reply && (binder_perf_evalue & BINDER_PERF_SEND_COUNTER)) {
-		int i, j;
-		int err_code = 0;
-
-		proc->bc_t++;
-		for (i = 0; i < BC_STATS_NR; i++) {
-			if (proc->bc_stats[i] == NULL)
-				proc->bc_stats[i] =
-				    kzalloc_preempt_disabled(sizeof(struct binder_bc_stats));
-			if (proc->bc_stats[i] == NULL) {
-				pr_err
-				    ("perf_e kzalloc fail for proc %d bc_stats[%d]\n",
-				     proc->pid, i);
-				err_code = 1;
-				goto out_err;
-			}
-			if (!strcmp(proc->bc_stats[i]->service, "") &&
-			    (0 == proc->bc_stats[i]->code[0])) {
-				strcpy(proc->bc_stats[i]->service, e->service);
-				break;
-			} else if (!strcmp(proc->bc_stats[i]->service, e->service))
-				break;
-			/*else
-				continue;*/
-		}
-		if (BC_STATS_NR == i) {
-			pr_err("perf_e bc_Stats array size" " is not enough\n");
-			err_code = 2;
-			goto out_err;
-		}
-		for (j = 0; j < BC_CODE_NR; j++) {
-			if (0 == proc->bc_stats[i]->code[j]) {
-				proc->bc_stats[i]->code[j] = e->code;
-				proc->bc_stats[i]->code_num[j]++;
-				break;
-			} else if (proc->bc_stats[i]->code[j] == e->code) {
-				proc->bc_stats[i]->code_num[j]++;
-				break;
-			} /*else
-				continue;*/
-		}
-		if (BC_CODE_NR == j) {
-			pr_err("perf_e bc_code array size" " is not enough\n");
-			err_code = 3;
-		}
-out_err:
-		pr_err("perf_e update proc %d bc_stats error %d\n", proc->pid, err_code);
-	}
-#endif
 	if (reply)
 		binder_debug(BINDER_DEBUG_TRANSACTION,
 			     "%d:%d BC_REPLY %d -> %d:%d, data %016llx-%016llx size %lld-%lld\n",
@@ -2984,7 +2852,7 @@ out_err:
 		case BINDER_TYPE_HANDLE:
 		case BINDER_TYPE_WEAK_HANDLE:{
 				struct binder_ref *ref = binder_get_ref(proc, fp->handle,
-                                                        fp->type == BINDER_TYPE_HANDLE);
+							fp->type == BINDER_TYPE_HANDLE);
 
 				if (ref == NULL) {
 					binder_user_error
@@ -3285,8 +3153,8 @@ static int binder_thread_write(struct binder_proc *proc,
 				}
 			} else
 				ref = binder_get_ref(proc, target,
-						     cmd == BC_ACQUIRE ||
-						     cmd == BC_RELEASE);
+						cmd == BC_ACQUIRE ||
+						cmd == BC_RELEASE);
 			if (ref == NULL) {
 				binder_user_error("%d:%d refcount change on invalid ref %d\n",
 					proc->pid, thread->pid, target);
@@ -4370,9 +4238,11 @@ static int binder_ioctl_set_ctx_mgr(struct file *filp, struct binder_thread
 		ret = -EBUSY;
 		goto out;
 	}
+
 	ret = security_binder_set_context_mgr(proc->tsk);
 	if (ret < 0)
 		goto out;
+
 	if (uid_valid(binder_context_mgr_uid)) {
 		if (!uid_eq(binder_context_mgr_uid, curr_euid)) {
 			pr_err("BINDER_SET_CONTEXT_MGR bad uid %d != %d\n",
@@ -4392,7 +4262,7 @@ static int binder_ioctl_set_ctx_mgr(struct file *filp, struct binder_thread
 #ifdef BINDER_MONITOR
 	strcpy(binder_context_mgr_node->name, "servicemanager");
 	pr_debug("%d:%d set as servicemanager uid %d\n",
-		 proc->pid, thread->pid, binder_context_mgr_uid);
+		 proc->pid, thread->pid, __kuid_val(binder_context_mgr_uid));
 #endif
 	binder_context_mgr_node->local_weak_refs++;
 	binder_context_mgr_node->local_strong_refs++;
@@ -4899,19 +4769,6 @@ static void binder_deferred_release(struct binder_proc *proc)
 		     __func__, proc->pid, threads, nodes, incoming_refs,
 		     outgoing_refs, active_transactions, buffers, page_count);
 
-#ifdef BINDER_PERF_EVAL
-	{
-		int i;
-
-		for (i = 0; i < BC_STATS_NR; i++) {
-			if (proc->bc_stats[i] != NULL) {
-				kfree(proc->bc_stats[i]);
-				proc->bc_stats[i] = NULL;
-				pr_debug("binder_release: release %d bc_stats[%d]\n", proc->pid, i);
-			}
-		}
-	}
-#endif
 	kfree(proc);
 }
 
@@ -4999,9 +4856,9 @@ static void print_binder_transaction(struct seq_file *m, const char *prefix,
 	seq_printf(m, " size %zd:%zd data %p auf %d start %lu.%06lu",
 		   t->buffer->data_size, t->buffer->offsets_size,
 		   t->buffer->data, t->buffer->allow_user_free,
-		   (unsigned long)t->timestamp.tv_sec);
+		   (unsigned long)t->timestamp.tv_sec,
+		   (t->timestamp.tv_nsec / NSEC_PER_USEC));
 	seq_printf(m, " android %d-%02d-%02d %02d:%02d:%02d.%03lu\n",
-		   (t->timestamp.tv_nsec / NSEC_PER_USEC),
 		   (tm.tm_year + 1900), (tm.tm_mon + 1), tm.tm_mday,
 		   tm.tm_hour, tm.tm_min, tm.tm_sec,
 		   (unsigned long)(t->tv.tv_usec / USEC_PER_MSEC));
@@ -5242,111 +5099,6 @@ static void print_binder_stats(struct seq_file *m, const char *prefix, struct bi
 	}
 }
 
-#ifdef BINDER_PERF_EVAL
-static void print_binder_timeout_stats(struct seq_file *m, const char *prefix,
-				       struct binder_timeout_stats *to_stats)
-{
-	int i, j;
-
-	BUILD_BUG_ON(ARRAY_SIZE(to_stats->bto) != (ARRAY_SIZE(binder_wait_on_str) - 1));
-	for (i = 0; i < ARRAY_SIZE(to_stats->bto); i++) {
-		if (to_stats->bto[i])
-			seq_printf(m, "%s%s: %lu\n", prefix,
-				   binder_wait_on_str[i + 1], to_stats->bto[i]);
-	}
-	for (i = 0, j = 0; i < ARRAY_SIZE(to_stats->read_t); i++) {
-		struct timespec sub_t = to_stats->read_t[i];
-
-		if (sub_t.tv_sec) {
-			j++;
-			if (!i)
-				seq_printf(m,
-					   "%s%s:  timeout total time list:\n",
-					   prefix, binder_wait_on_str[WAIT_ON_READ]);
-
-			seq_printf(m, "  %s%u.%03ld", prefix,
-				   (unsigned)sub_t.tv_sec, (sub_t.tv_nsec / NSEC_PER_MSEC));
-		}
-	}
-	if (j)
-		seq_puts(m, "\n");
-	for (i = 0, j = 0; i < ARRAY_SIZE(to_stats->exec_t); i++) {
-		struct timespec sub_t = to_stats->exec_t[i];
-
-		if (sub_t.tv_sec) {
-			j++;
-			if (!i)
-				seq_printf(m,
-					   "%s%s:  timeout total time list:\n",
-					   prefix, binder_wait_on_str[WAIT_ON_EXEC]);
-
-			seq_printf(m, "  %s%u.%03ld", prefix,
-				   (unsigned)sub_t.tv_sec, (sub_t.tv_nsec / NSEC_PER_MSEC));
-		}
-	}
-	if (j)
-		seq_puts(m, "\n");
-	for (i = 0, j = 0; i < ARRAY_SIZE(to_stats->rrply_t); i++) {
-		struct timespec sub_t = to_stats->rrply_t[i];
-
-		if (sub_t.tv_sec) {
-			j++;
-			if (!i)
-				seq_printf(m,
-					   "%s%s:  timeout total time list:\n",
-					   prefix, binder_wait_on_str[WAIT_ON_REPLY_READ]);
-
-			seq_printf(m, "  %s%u.%03ld", prefix,
-				   (unsigned)sub_t.tv_sec, (sub_t.tv_nsec / NSEC_PER_MSEC));
-		}
-	}
-	if (j)
-		seq_puts(m, "\n");
-}
-
-static void print_binder_proc_perf_timeout_stats(struct seq_file *m, struct binder_proc *proc)
-{
-	struct rb_node *n;
-	int i;
-
-	int proc_to_counter = 0;
-
-	for (i = 0; i < ARRAY_SIZE(proc->to_stats.bto); i++) {
-		proc_to_counter += proc->to_stats.bto[i];
-		if (proc_to_counter > 0)
-			break;
-	}
-	if (proc_to_counter > 0) {
-		seq_printf(m, "proc %d(%s) timeout stats:\n",
-			   proc->pid, (proc->tsk != NULL) ? proc->tsk->comm : "");
-		print_binder_timeout_stats(m, "  ", &proc->to_stats);
-
-		seq_puts(m, "  threads timeout stats:\n");
-		for (n = rb_first(&proc->threads); n != NULL; n = rb_next(n)) {
-			int thread_to_counter = 0;
-			struct binder_thread *thread = rb_entry(n, struct binder_thread, rb_node);
-
-			for (i = 0; i < ARRAY_SIZE(thread->to_stats.bto); i++) {
-				thread_to_counter += thread->to_stats.bto[i];
-				if (thread_to_counter > 0)
-					break;
-			}
-			if (thread_to_counter > 0) {
-				seq_printf(m, "  thread: %d\n", thread->pid);
-				print_binder_timeout_stats(m, "    ", &thread->to_stats);
-			}
-		}
-	}
-
-}
-
-static int binder_perf_stats_show(struct seq_file *m, void *unused)
-{
-	return 0;
-}
-
-#endif
-
 static void print_binder_proc_stats(struct seq_file *m, struct binder_proc *proc)
 {
 	struct binder_work *w;
@@ -5497,7 +5249,6 @@ static void print_binder_transaction_log_entry(struct seq_file *m, struct
 	struct timespec sub_read_t, sub_total_t;
 	unsigned long read_ms = 0;
 	unsigned long total_ms = 0;
-	int ptr = 0;
 
 	memset(&sub_read_t, 0, sizeof(sub_read_t));
 	memset(&sub_total_t, 0, sizeof(sub_total_t));
@@ -5621,106 +5372,6 @@ static struct miscdevice binder_miscdev = {
 	.fops = &binder_fops
 };
 
-#ifdef BINDER_PERF_EVAL
-static void binder_perf_timeout_zero_init(struct binder_timeout_stats *to_stats)
-{
-	memset(&to_stats->bto[0], 0, sizeof(to_stats->bto));
-	memset(&to_stats->read_t[0], 0, sizeof(to_stats->read_t));
-	memset(&to_stats->exec_t[0], 0, sizeof(to_stats->exec_t));
-	memset(&to_stats->rrply_t[0], 0, sizeof(to_stats->rrply_t));
-}
-
-static void binder_perf_stats_timeout_clean(void)
-{
-	struct binder_proc *proc;
-	struct rb_node *n;
-	int do_lock = !binder_debug_no_lock;
-
-	if (do_lock)
-		binder_lock(__func__);
-	hlist_for_each_entry(proc, &binder_procs, proc_node) {
-		binder_perf_timeout_zero_init(&proc->to_stats);
-		for (n = rb_first(&proc->threads); n != NULL; n = rb_next(n)) {
-			struct binder_thread *thread = rb_entry(n, struct binder_thread, rb_node);
-
-			binder_perf_timeout_zero_init(&thread->to_stats);
-		}
-	}
-	if (do_lock)
-		binder_unlock(__func__);
-}
-
-static void binder_perf_stats_bct_clean(void)
-{
-	struct binder_proc *proc;
-	int do_lock = !binder_debug_no_lock;
-
-	if (do_lock)
-		binder_lock(__func__);
-	hlist_for_each_entry(proc, &binder_procs, proc_node) {
-		int i;
-
-		proc->bc_t = 0;
-		for (i = 0; i < BC_STATS_NR; i++) {
-			if (proc->bc_stats[i] != NULL) {
-				kfree(proc->bc_stats[i]);
-				proc->bc_stats[i] = NULL;
-			}
-		}
-	}
-	if (do_lock)
-		binder_unlock(__func__);
-}
-
-static int binder_perf_evalue_show(struct seq_file *m, void *unused)
-{
-	seq_printf(m, " Current binder performance evalue is: %u\n", binder_perf_evalue);
-	return 0;
-}
-
-static ssize_t binder_perf_evalue_write(struct file *filp, const char *ubuf,
-					size_t cnt, loff_t *data)
-{
-	char buf[32];
-	size_t copy_size = cnt;
-	unsigned long val;
-	int ret;
-
-	if (cnt >= sizeof(buf))
-		copy_size = 32 - 1;
-	buf[copy_size] = '\0';
-
-	if (copy_from_user_preempt_disabled(&buf, ubuf, copy_size))
-		return -EFAULT;
-
-	pr_debug("[Binder] Set binder perf evalue:%u -> ", binder_perf_evalue);
-	ret = kstrtoul(buf, 10, &val);
-	if (ret < 0) {
-		pr_debug("Null\ninvalid string, need number foramt, err:%d\n", ret);
-		pr_debug("perf evalue level:   0  ---- 3\n");
-		pr_debug("		   Less ---- More\n");
-		return cnt;	/* string to unsined long fail */
-	}
-	pr_debug("%lu\n", val);
-	if (val < 4) {
-		binder_perf_evalue = val;
-		if (0 == (val & BINDER_PERF_SEND_COUNTER))
-			binder_perf_stats_bct_clean();
-		if (0 == (val & BINDER_PERF_TIMEOUT_COUNTER))
-			binder_perf_stats_timeout_clean();
-	} else {
-		pr_debug("invalid value:%lu, should be 0 ~ 3\n", val);
-	}
-	pr_debug("%d (%s) set performance evaluate type %s %s\n",
-		 task_pid_nr(current), current->comm,
-		 (binder_perf_evalue & BINDER_PERF_SEND_COUNTER) ?
-		 "sender counter enable" : "",
-		 (binder_perf_evalue & BINDER_PERF_TIMEOUT_COUNTER) ?
-		 "time out counter enable" : "");
-
-	return cnt;
-}
-#endif
 #ifdef BINDER_MONITOR
 static int binder_log_level_show(struct seq_file *m, void *unused)
 {
@@ -5861,13 +5512,7 @@ timeout_log_show_unlock:
 }
 
 BINDER_DEBUG_SETTING_ENTRY(log_level);
-#ifdef BINDER_PERF_EVAL
-BINDER_DEBUG_SETTING_ENTRY(perf_evalue);
-#endif
 BINDER_DEBUG_ENTRY(timeout_log);
-#ifdef BINDER_PERF_EVAL
-BINDER_DEBUG_ENTRY(perf_stats);
-#endif
 
 static int binder_transaction_log_enable_show(struct seq_file *m, void *unused)
 {
@@ -6062,14 +5707,6 @@ static int __init binder_init(void)
 				    S_IRUGO,
 				    binder_debugfs_dir_entry_root,
 				    &binder_timeout_log_t, &binder_timeout_log_fops);
-#endif
-#ifdef BINDER_PERF_EVAL
-		debugfs_create_file("perf_evalue",
-				    (S_IRUGO | S_IWUSR | S_IWGRP),
-				    binder_debugfs_dir_entry_root, NULL, &binder_perf_evalue_fops);
-		debugfs_create_file("perf_stats",
-					S_IRUGO,
-					binder_debugfs_dir_entry_root, NULL, &binder_perf_stats_fops);
 #endif
 #ifdef MTK_BINDER_PAGE_USED_RECORD
 		debugfs_create_file("page_used",
