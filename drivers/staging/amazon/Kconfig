@@ -1,0 +1,98 @@
+menu "Amazon"
+
+config AMAZON
+	bool "Amazon Drivers"
+	default N
+	---help---
+	  Enable support for various drivers needed on the Amazon Fire OS platform
+
+if AMAZON
+
+config AMAZON_KLOG_CONSOLE
+	bool "Amazon Kernel Log Console"
+	depends on ANDROID_LOGGER
+	default N
+	---help---
+	  provide the kernel log console which will rewrite the kernel message to Android Logger buffer.
+
+config AMAZON_KLOG_CONSOLE_TRYLOCK
+	bool "Amazon Kernel Log Console"
+	depends on AMAZON_KLOG_CONSOLE
+	default n
+	---help---
+	  try to get the mutex before we write outthe current payload.
+
+config AMAZON_LOGD
+    bool "Amazon Logd"
+    depends on ANDROID_LOGGER
+    default N
+    ---help---
+      device uses logd for logging
+
+config AMAZON_SIGN_OF_LIFE
+	bool "Amazon Sign of Life"
+	help
+	enable the life cycle metrics to log device boot and shutdown information
+
+config AMAZON_SIGN_OF_LIFE_MTK
+	bool "Amazon Sign of Life MTK platform implementation"
+	help
+	enable the life cycle metrics to log device boot and shutdown information on MTK Platform
+
+config AMAZON_SIGN_OF_LIFE
+	bool "Amazon Sign of Life"
+	help
+	enable the life cycle metrics to log device boot and shutdown information
+
+config AMAZON_SIGN_OF_LIFE_MTK
+	bool "Amazon Sign of Life MTK platform implementation"
+	help
+	enable the life cycle metrics to log device boot and shutdown information on MTK Platform
+
+config AMAZON_POWEROFF_LOG
+	bool "Long press key power off log"
+	default N
+	help
+	enable Long press key power off log
+
+config abh123
+	bool "abh123 MTK platform project"
+	help
+	isolate amazon abh123 changes for MTK Platform
+
+config rbc123
+	bool "rbc123 MTK platform project"
+	help
+	isolate amazon rbc123 changes for MTK Platform
+
+config abc123
+	bool "abc123 MTK platform project"
+	help
+	isolate Amazon abc123 changes for MTK Platform
+
+config AMAZON_LL_LOG
+        bool "Low Level Log Support"
+        depends on PROC_FS
+        default n
+        help
+          Cache the log of LK and Preloader at /proc/pllk.
+
+config AMAZON_A2DP_TS
+	bool "Gather and report A2DP timestamps"
+	depends on MTK_BTIF
+	help
+	Enable A2DP timestamps reporting to user space
+
+choice
+	prompt "A2DP timestamps"
+	depends on AMAZON_A2DP_TS
+	default AMAZON_A2DP_TS_DMA
+
+config AMAZON_A2DP_TS_DMA
+	bool "A2DP timestamps are gathered when we trigger DMA transfer"
+
+endchoice
+
+endif # if AMAZON
+
+endmenu

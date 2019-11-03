@@ -1,0 +1,5 @@
+config MTK_TC1_FEATURE
+	bool "MTK_TC1_FEATURE"
+	default n
+	help
+	  MTK_TC1_FEATURE
