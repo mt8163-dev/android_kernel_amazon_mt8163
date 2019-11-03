@@ -229,47 +229,9 @@ static void gic_eoi_irq(struct irq_data *d)
 	gic_write_eoir(gic_irq(d));
 }
 
-void __iomem *INT_POL_CTL_REG;
-phys_addr_t INT_POL_CTL_phys;
-
-__weak void _mt_set_pol_reg(u32 reg_index, u32 value)
+/* should be define in mtk-gic-v3-extend.c */
+__weak void _mt_irq_set_polarity(unsigned int irq, unsigned int polarity)
 {
-	writel_relaxed(value, (INT_POL_CTL_REG + (reg_index * 4)));
-}
-
-
-void _mt_irq_set_polarity(unsigned int irq, unsigned int polarity)
-{
-	u32 offset, reg_index, value;
-
-	if (irq < 32) {
-		pr_err("Fail to set polarity of interrupt %d\n", irq);
-		return;
-	}
-
-	offset = (irq - 32) & 0x1F;
-	reg_index = (irq - 32) >> 5;
-
-	/* tmp hack for everest, non-continuous POL registers allocations */
-	if (reg_index >= 8) {
-		reg_index -= 8;
-		reg_index += 0x70/4;
-	}
-
-	if (polarity == 0) {
-		/* active low */
-		value = readl_relaxed(IOMEM(INT_POL_CTL_REG + (reg_index * 4)));
-		value |= (1 << offset);
-		/* some platforms has to write POL register in secure world.
-		USE PHYSICALL ADDRESS */
-		_mt_set_pol_reg(reg_index, value);
-	} else {
-		/* active high */
-		value = readl_relaxed(IOMEM(INT_POL_CTL_REG + (reg_index * 4)));
-		value &= ~(0x1 << offset);
-		/* some platforms has to write POL register in secure world */
-		_mt_set_pol_reg(reg_index, value);
-	}
 }
 
 static int gic_set_type(struct irq_data *d, unsigned int type)
@@ -352,7 +314,9 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 static void __init gic_dist_init(void)
 {
 	unsigned int i;
+#ifndef CONFIG_MTK_IRQ_NEW_DESIGN
 	u64 affinity;
+#endif
 	void __iomem *base = gic_data.dist_base;
 
 	/* Disable the distributor */
@@ -365,6 +329,7 @@ static void __init gic_dist_init(void)
 	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
 		       base + GICD_CTLR);
 
+#ifndef CONFIG_MTK_IRQ_NEW_DESIGN
 	/*
 	 * Set all global interrupts to the boot CPU only. ARE must be
 	 * enabled.
@@ -372,6 +337,12 @@ static void __init gic_dist_init(void)
 	affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
 	for (i = 32; i < gic_data.irq_nr; i++)
 		writeq_relaxed(affinity, base + GICD_IROUTER + i * 8);
+#else
+	/* default set target all for all SPI */
+	for (i = 32; i < gic_data.irq_nr; i++)
+		writeq_relaxed(GICD_IROUTER_SPI_MODE_ANY,
+				base + GICD_IROUTER + i * 8);
+#endif
 }
 
 static int gic_populate_rdist(void)
@@ -624,6 +595,51 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 		gic_dist_wait_for_rwp();
 
 	return IRQ_SET_MASK_OK;
+#else
+	/*
+	 * no need to update when:
+	 * input mask is equal to the current setting
+	 */
+	if (cpumask_equal(d->affinity, mask_val))
+		return IRQ_SET_MASK_OK_NOCOPY;
+
+	/*
+	 * cpumask_first_and() returns >= nr_cpu_ids when the intersection
+	 * of inputs is an empty set -> return error when this is not a "forced" update
+	 */
+	if (!force && (cpumask_first_and(mask_val, cpu_online_mask) >= nr_cpu_ids))
+		return -EINVAL;
+
+	if (gic_irq_in_rdist(d))
+		return -EINVAL;
+
+	/* If interrupt was enabled, disable it first */
+	enabled = gic_peek_irq(d, GICD_ISENABLER);
+	if (enabled)
+		gic_mask_irq(d);
+
+
+	reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
+
+	/* GICv3 supports target is 1 or all */
+	if (cpumask_weight(mask_val) > 1)
+		val = GICD_IROUTER_SPI_MODE_ANY;
+	else
+		val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+
+	writeq_relaxed(val, reg);
+
+	/*
+	 * If the interrupt was enabled, enabled it again. Otherwise,
+	 * just wait for the distributor to have digested our changes.
+	 */
+	if (enabled)
+		gic_unmask_irq(d);
+	else
+		gic_dist_wait_for_rwp();
+
+	return IRQ_SET_MASK_OK;
+#endif
 }
 #else
 #define gic_set_affinity	NULL
@@ -714,6 +730,15 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
 	return 0;
 }
 
+static int mt_gic_irqs;
+
+#ifndef CONFIG_MTK_GIC
+int mt_get_supported_irq_num(void)
+{
+	return mt_gic_irqs;
+}
+#endif
+
 static const struct irq_domain_ops gic_irq_domain_ops = {
 	.map = gic_irq_domain_map,
 	.xlate = gic_irq_domain_xlate,
@@ -765,14 +790,6 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 			goto out_unmap_rdist;
 		}
 	}
-
-	pol_base = of_iomap(node, redist_regions+1);
-	WARN(!pol_base, "unable to map pol registers\n");
-	INT_POL_CTL_REG = pol_base;
-	if (of_address_to_resource(node, redist_regions+1, &res))
-		WARN(!pol_base, "unable to map pol registers\n");
-
-	INT_POL_CTL_phys = res.start;
 
 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
 		redist_stride = 0;

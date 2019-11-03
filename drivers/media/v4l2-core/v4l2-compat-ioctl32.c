@@ -56,13 +56,9 @@ struct v4l2_window32 {
 	__u8                    global_alpha;
 };
 
-<<<<<<< HEAD
-static int bufsize_v4l2_window32(struct v4l2_window32 __user *up)
-=======
 static int get_v4l2_window32(struct v4l2_window __user *kp,
 			     struct v4l2_window32 __user *up,
 			     void __user *aux_buf, u32 aux_space)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	struct v4l2_clip32 __user *uclips;
 	struct v4l2_clip __user *kclips;
@@ -78,26 +74,6 @@ static int get_v4l2_window32(struct v4l2_window __user *kp,
 	    put_user(clipcount, &kp->clipcount))
 		return -EFAULT;
 	if (clipcount > 2048)
-<<<<<<< HEAD
-		return -EINVAL;
-	return clipcount * sizeof(struct v4l2_clip);
-}
-
-static int get_v4l2_window32(struct v4l2_window __user *kp, struct
-		v4l2_window32 __user *up, void __user *aux_buf, int aux_space)
-{
-	__u32 clipcount;
-
-	if (!access_ok(VERIFY_READ, up, sizeof(struct v4l2_window32)) ||
-		copy_in_user(&kp->w, &up->w, sizeof(up->w)) ||
-		convert_in_user(&up->field, &kp->field) ||
-		convert_in_user(&up->chromakey, &kp->chromakey) ||
-		get_user(clipcount, &up->clipcount) ||
-		put_user(clipcount, &kp->clipcount))
-			return -EFAULT;
-	if (clipcount > 2048)
-=======
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		return -EINVAL;
 	if (!clipcount)
 		return put_user(NULL, &kp->clips);
@@ -122,12 +98,8 @@ static int get_v4l2_window32(struct v4l2_window __user *kp, struct
 	return 0;
 }
 
-<<<<<<< HEAD
-static int put_v4l2_window32(struct v4l2_window __user *kp, struct v4l2_window32 __user *up)
-=======
 static int put_v4l2_window32(struct v4l2_window __user *kp,
 			     struct v4l2_window32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	struct v4l2_clip __user *kclips;
 	struct v4l2_clip32 __user *uclips;
@@ -187,33 +159,6 @@ struct v4l2_create_buffers32 {
 	__u32			reserved[8];
 };
 
-<<<<<<< HEAD
-static int __bufsize_v4l2_format32(struct v4l2_format32 __user *up)
-{
-	__u32 type;
-
-	if (get_user(type, &up->type))
-		return -EFAULT;
-
-	switch (type) {
-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
-	case V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY:
-		return bufsize_v4l2_window32(&up->fmt.win);
-	default:
-		return 0;
-	}
-}
-
-static int __get_v4l2_format32(struct v4l2_format __user *kp, struct
-		v4l2_format32 __user *up, void __user *aux_buf, int aux_space)
-{
-	__u32 type;
-
-	if (get_user(type, &up->type) || put_user(type, &kp->type))
-		return -EFAULT;
-
-	switch (type) {
-=======
 static int __bufsize_v4l2_format(struct v4l2_format32 __user *up, u32 *size)
 {
 	u32 type;
@@ -256,7 +201,6 @@ static int __get_v4l2_format32(struct v4l2_format __user *kp,
 		return -EFAULT;
 
 	switch (type) {
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
 		return copy_in_user(&kp->fmt.pix, &up->fmt.pix,
@@ -267,12 +211,8 @@ static int __get_v4l2_format32(struct v4l2_format __user *kp,
 				    sizeof(kp->fmt.pix_mp)) ? -EFAULT : 0;
 	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY:
-<<<<<<< HEAD
-		return get_v4l2_window32(&kp->fmt.win, &up->fmt.win, aux_buf, aux_space);
-=======
 		return get_v4l2_window32(&kp->fmt.win, &up->fmt.win,
 					 aux_buf, aux_space);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	case V4L2_BUF_TYPE_VBI_CAPTURE:
 	case V4L2_BUF_TYPE_VBI_OUTPUT:
 		return copy_in_user(&kp->fmt.vbi, &up->fmt.vbi,
@@ -286,33 +226,6 @@ static int __get_v4l2_format32(struct v4l2_format __user *kp,
 	}
 }
 
-<<<<<<< HEAD
-static int bufsize_v4l2_format32(struct v4l2_format32 __user *up)
-{
-	if (!access_ok(VERIFY_READ, up, sizeof(*up)))
-		return -EFAULT;
-	return __bufsize_v4l2_format32(up);
-}
-
-static int get_v4l2_format32(struct v4l2_format __user *kp, struct
-		v4l2_format32 __user *up, void __user *aux_buf, int aux_space)
-{
-	if (!access_ok(VERIFY_READ, up, sizeof(struct v4l2_format32)))
-		return -EFAULT;
-	return __get_v4l2_format32(kp, up, aux_buf, aux_space);
-}
-
-static int bufsize_v4l2_create32(struct v4l2_create_buffers32 __user *up)
-{
-	if (!access_ok(VERIFY_READ, up, sizeof(struct v4l2_create_buffers32)))
-		return -EFAULT;
-	return __bufsize_v4l2_format32(&up->format);
-}
-
-static int get_v4l2_create32(struct v4l2_create_buffers __user *kp, struct
-		v4l2_create_buffers32 __user *up, void __user *aux_buf,
-		int aux_space)
-=======
 static int get_v4l2_format32(struct v4l2_format __user *kp,
 			     struct v4l2_format32 __user *up,
 			     void __user *aux_buf, u32 aux_space)
@@ -333,21 +246,12 @@ static int bufsize_v4l2_create(struct v4l2_create_buffers32 __user *up,
 static int get_v4l2_create32(struct v4l2_create_buffers __user *kp,
 			     struct v4l2_create_buffers32 __user *up,
 			     void __user *aux_buf, u32 aux_space)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (!access_ok(VERIFY_READ, up, sizeof(*up)) ||
 	    copy_in_user(kp, up,
 			 offsetof(struct v4l2_create_buffers32, format)) ||
 	    copy_in_user(kp->reserved, up->reserved, sizeof(kp->reserved)))
 		return -EFAULT;
-<<<<<<< HEAD
-	return __get_v4l2_format32(&kp->format, &up->format, aux_buf, aux_space);
-}
-
-static int __put_v4l2_format32(struct v4l2_format __user *kp, struct v4l2_format32 __user *up)
-{
-	__u32 type;
-=======
 	return __get_v4l2_format32(&kp->format, &up->format,
 				   aux_buf, aux_space);
 }
@@ -356,7 +260,6 @@ static int __put_v4l2_format32(struct v4l2_format __user *kp,
 			       struct v4l2_format32 __user *up)
 {
 	u32 type;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 
 	if (get_user(type, &kp->type))
 		return -EFAULT;
@@ -386,24 +289,16 @@ static int __put_v4l2_format32(struct v4l2_format __user *kp,
 	}
 }
 
-<<<<<<< HEAD
-static int put_v4l2_format32(struct v4l2_format __user *kp, struct v4l2_format32 __user *up)
-=======
 static int put_v4l2_format32(struct v4l2_format __user *kp,
 			     struct v4l2_format32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (!access_ok(VERIFY_WRITE, up, sizeof(*up)))
 		return -EFAULT;
 	return __put_v4l2_format32(kp, up);
 }
 
-<<<<<<< HEAD
-static int put_v4l2_create32(struct v4l2_create_buffers __user *kp, struct v4l2_create_buffers32 __user *up)
-=======
 static int put_v4l2_create32(struct v4l2_create_buffers __user *kp,
 			     struct v4l2_create_buffers32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (!access_ok(VERIFY_WRITE, up, sizeof(*up)) ||
 	    copy_in_user(up, kp,
@@ -422,12 +317,8 @@ struct v4l2_standard32 {
 	__u32		     reserved[4];
 };
 
-<<<<<<< HEAD
-static int get_v4l2_standard32(struct v4l2_standard __user *kp, struct v4l2_standard32 __user *up)
-=======
 static int get_v4l2_standard32(struct v4l2_standard __user *kp,
 			       struct v4l2_standard32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	/* other fields are not set by the user, nor used by the driver */
 	if (!access_ok(VERIFY_READ, up, sizeof(*up)) ||
@@ -436,12 +327,8 @@ static int get_v4l2_standard32(struct v4l2_standard __user *kp,
 	return 0;
 }
 
-<<<<<<< HEAD
-static int put_v4l2_standard32(struct v4l2_standard __user *kp, struct v4l2_standard32 __user *up)
-=======
 static int put_v4l2_standard32(struct v4l2_standard __user *kp,
 			       struct v4l2_standard32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (!access_ok(VERIFY_WRITE, up, sizeof(*up)) ||
 	    assign_in_user(&up->index, &kp->index) ||
@@ -494,11 +381,7 @@ static int get_v4l2_plane32(struct v4l2_plane __user *up,
 			    struct v4l2_plane32 __user *up32,
 			    enum v4l2_memory memory)
 {
-<<<<<<< HEAD
-	compat_long_t p;
-=======
 	compat_ulong_t p;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 
 	if (copy_in_user(up, up32, 2 * sizeof(__u32)) ||
 	    copy_in_user(&up->data_offset, &up32->data_offset,
@@ -559,35 +442,6 @@ static int put_v4l2_plane32(struct v4l2_plane __user *up,
 	return 0;
 }
 
-<<<<<<< HEAD
-static int bufsize_v4l2_buffer32(struct v4l2_buffer32 __user *up)
-{
-	__u32 type;
-	__u32 length;
-
-	if (!access_ok(VERIFY_READ, up, sizeof(struct v4l2_buffer32)) ||
-			get_user(type, &up->type) ||
-			get_user(length, &up->length))
-		return -EFAULT;
-
-	if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-		if (length > VIDEO_MAX_PLANES)
-			return -EINVAL;
-
-		/* We don't really care if userspace decides to kill itself
-		 * by passing a very big length value
-		 */
-		return length * sizeof(struct v4l2_plane);
-	}
-	return 0;
-}
-
-static int get_v4l2_buffer32(struct v4l2_buffer __user *kp, struct
-		v4l2_buffer32 __user *up, void __user *aux_buf, int aux_space)
-{
-	__u32 type;
-	__u32 length;
-=======
 static int bufsize_v4l2_buffer(struct v4l2_buffer32 __user *up, u32 *size)
 {
 	u32 type;
@@ -619,7 +473,6 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *kp,
 {
 	u32 type;
 	u32 length;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	enum v4l2_memory memory;
 	struct v4l2_plane32 __user *uplane32;
 	struct v4l2_plane __user *uplane;
@@ -650,15 +503,10 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *kp,
 		u32 num_planes = length;
 
 		if (num_planes == 0) {
-<<<<<<< HEAD
-			/* num_planes == 0 is legal, e.g. when userspace doesn't
-			 * need planes array on DQBUF*/
-=======
 			/*
 			 * num_planes == 0 is legal, e.g. when userspace doesn't
 			 * need planes array on DQBUF
 			 */
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 			return put_user(NULL, &kp->m.planes);
 		}
 		if (num_planes > VIDEO_MAX_PLANES)
@@ -679,16 +527,12 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *kp,
 		if (aux_space < num_planes * sizeof(*uplane))
 			return -EFAULT;
 
-<<<<<<< HEAD
-		while (--num_planes >= 0) {
-=======
 		uplane = aux_buf;
 		if (put_user((__force struct v4l2_plane *)uplane,
 			     &kp->m.planes))
 			return -EFAULT;
 
 		while (num_planes--) {
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 			ret = get_v4l2_plane32(uplane, uplane32, memory);
 			if (ret)
 				return ret;
@@ -705,30 +549,14 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *kp,
 		case V4L2_MEMORY_USERPTR: {
 			compat_ulong_t userptr;
 
-<<<<<<< HEAD
-				if (get_user(tmp, &up->m.userptr))
-					return -EFAULT;
-
-				if (get_user(tmp, &up->m.userptr) ||
-					put_user((unsigned long)
-						compat_ptr(tmp),
-						&kp->m.userptr))
-					return -EFAULT;
-			}
-=======
 			if (get_user(userptr, &up->m.userptr) ||
 			    put_user((unsigned long)compat_ptr(userptr),
 				     &kp->m.userptr))
 				return -EFAULT;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 			break;
 		}
 		case V4L2_MEMORY_DMABUF:
-<<<<<<< HEAD
-			if (convert_in_user(&up->m.fd, &kp->m.fd))
-=======
 			if (assign_in_user(&kp->m.fd, &up->m.fd))
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 				return -EFAULT;
 			break;
 		}
@@ -737,18 +565,11 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *kp,
 	return 0;
 }
 
-<<<<<<< HEAD
-static int put_v4l2_buffer32(struct v4l2_buffer __user *kp, struct v4l2_buffer32 __user *up)
-{
-	__u32 type;
-	__u32 length;
-=======
 static int put_v4l2_buffer32(struct v4l2_buffer __user *kp,
 			     struct v4l2_buffer32 __user *up)
 {
 	u32 type;
 	u32 length;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	enum v4l2_memory memory;
 	struct v4l2_plane32 __user *uplane32;
 	struct v4l2_plane __user *uplane;
@@ -776,19 +597,9 @@ static int put_v4l2_buffer32(struct v4l2_buffer __user *kp,
 	    put_user(length, &up->length))
 		return -EFAULT;
 
-<<<<<<< HEAD
-	if (V4L2_TYPE_IS_PRIVATE(type)) {
-		if (convert_in_user(&kp->m.userptr, &up->m.userptr))
-			return -EFAULT;
-	}
-
-	if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
-		num_planes = length;
-=======
 	if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
 		u32 num_planes = length;
 
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		if (num_planes == 0)
 			return 0;
 
@@ -798,11 +609,7 @@ static int put_v4l2_buffer32(struct v4l2_buffer __user *kp,
 			return -EFAULT;
 		uplane32 = compat_ptr(p);
 
-<<<<<<< HEAD
-		while (--num_planes >= 0) {
-=======
 		while (num_planes--) {
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 			ret = put_v4l2_plane32(uplane, uplane32, memory);
 			if (ret)
 				return ret;
@@ -821,11 +628,7 @@ static int put_v4l2_buffer32(struct v4l2_buffer __user *kp,
 				return -EFAULT;
 			break;
 		case V4L2_MEMORY_DMABUF:
-<<<<<<< HEAD
-			if (convert_in_user(&kp->m.fd, &up->m.fd))
-=======
 			if (assign_in_user(&up->m.fd, &kp->m.fd))
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 				return -EFAULT;
 			break;
 		}
@@ -850,12 +653,8 @@ struct v4l2_framebuffer32 {
 	} fmt;
 };
 
-<<<<<<< HEAD
-static int get_v4l2_framebuffer32(struct v4l2_framebuffer __user *kp, struct v4l2_framebuffer32 __user *up)
-=======
 static int get_v4l2_framebuffer32(struct v4l2_framebuffer __user *kp,
 				  struct v4l2_framebuffer32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	compat_caddr_t tmp;
 
@@ -869,12 +668,8 @@ static int get_v4l2_framebuffer32(struct v4l2_framebuffer __user *kp,
 	return 0;
 }
 
-<<<<<<< HEAD
-static int put_v4l2_framebuffer32(struct v4l2_framebuffer __user *kp, struct v4l2_framebuffer32 __user *up)
-=======
 static int put_v4l2_framebuffer32(struct v4l2_framebuffer __user *kp,
 				  struct v4l2_framebuffer32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	void *base;
 
@@ -900,30 +695,20 @@ struct v4l2_input32 {
 	__u32	     reserved[3];
 };
 
-<<<<<<< HEAD
-/* The 64-bit v4l2_input struct has extra padding at the end of the struct.
-   Otherwise it is identical to the 32-bit version. */
-static inline int get_v4l2_input32(struct v4l2_input __user *kp, struct v4l2_input32 __user *up)
-=======
 /*
  * The 64-bit v4l2_input struct has extra padding at the end of the struct.
  * Otherwise it is identical to the 32-bit version.
  */
 static inline int get_v4l2_input32(struct v4l2_input __user *kp,
 				   struct v4l2_input32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (copy_in_user(kp, up, sizeof(*up)))
 		return -EFAULT;
 	return 0;
 }
 
-<<<<<<< HEAD
-static inline int put_v4l2_input32(struct v4l2_input __user *kp, struct v4l2_input32 __user *up)
-=======
 static inline int put_v4l2_input32(struct v4l2_input __user *kp,
 				   struct v4l2_input32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (copy_in_user(up, kp, sizeof(*up)))
 		return -EFAULT;
@@ -1000,13 +785,8 @@ static int get_v4l2_ext_controls32(struct file *file,
 {
 	struct v4l2_ext_control32 __user *ucontrols;
 	struct v4l2_ext_control __user *kcontrols;
-<<<<<<< HEAD
-	__u32 count;
-	unsigned int n;
-=======
 	u32 count;
 	u32 n;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	compat_caddr_t p;
 
 	if (!access_ok(VERIFY_READ, up, sizeof(*up)) ||
@@ -1063,13 +843,8 @@ static int put_v4l2_ext_controls32(struct file *file,
 {
 	struct v4l2_ext_control32 __user *ucontrols;
 	struct v4l2_ext_control __user *kcontrols;
-<<<<<<< HEAD
-	__u32 count;
-	unsigned int n;
-=======
 	u32 count;
 	u32 n;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	compat_caddr_t p;
 
 	if (!access_ok(VERIFY_WRITE, up, sizeof(*up)) ||
@@ -1090,13 +865,6 @@ static int put_v4l2_ext_controls32(struct file *file,
 		return -EFAULT;
 
 	for (n = 0; n < count; n++) {
-<<<<<<< HEAD
-		unsigned size = sizeof(*ucontrols);
-
-		/* Do not modify the pointer when copying a pointer control.
-		   The contents of the pointer was changed, not the pointer
-		   itself. */
-=======
 		unsigned int size = sizeof(*ucontrols);
 		u32 id;
 
@@ -1112,7 +880,6 @@ static int put_v4l2_ext_controls32(struct file *file,
 		 * The contents of the pointer was changed, not the pointer
 		 * itself.
 		 */
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		if (ctrl_is_pointer(file, id))
 			size -= sizeof(ucontrols->value64);
 
@@ -1137,12 +904,8 @@ struct v4l2_event32 {
 	__u32				reserved[8];
 };
 
-<<<<<<< HEAD
-static int put_v4l2_event32(struct v4l2_event __user *kp, struct v4l2_event32 __user *up)
-=======
 static int put_v4l2_event32(struct v4l2_event __user *kp,
 			    struct v4l2_event32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	if (!access_ok(VERIFY_WRITE, up, sizeof(*up)) ||
 	    assign_in_user(&up->type, &kp->type) ||
@@ -1165,12 +928,8 @@ struct v4l2_edid32 {
 	compat_caddr_t edid;
 };
 
-<<<<<<< HEAD
-static int get_v4l2_edid32(struct v4l2_edid __user *kp, struct v4l2_edid32 __user *up)
-=======
 static int get_v4l2_edid32(struct v4l2_edid __user *kp,
 			   struct v4l2_edid32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	compat_uptr_t tmp;
 
@@ -1185,12 +944,8 @@ static int get_v4l2_edid32(struct v4l2_edid __user *kp,
 	return 0;
 }
 
-<<<<<<< HEAD
-static int put_v4l2_edid32(struct v4l2_edid __user *kp, struct v4l2_edid32 __user *up)
-=======
 static int put_v4l2_edid32(struct v4l2_edid __user *kp,
 			   struct v4l2_edid32 __user *up)
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 {
 	void *edid;
 
@@ -1233,32 +988,6 @@ static int put_v4l2_edid32(struct v4l2_edid __user *kp,
 #define VIDIOC_G_OUTPUT32	_IOR ('V', 46, s32)
 #define VIDIOC_S_OUTPUT32	_IOWR('V', 47, s32)
 
-<<<<<<< HEAD
-/*
- * Note that these macros contain return statements to avoid the need for the
- * "caller" to check return values.
- */
-#define ALLOC_USER_SPACE(size) \
-({ \
-	void __user *up_native; \
-	up_native = compat_alloc_user_space(size); \
-	if (!up_native) \
-		return -ENOMEM; \
-	if (clear_user(up_native, size)) \
-		return -EFAULT; \
-	up_native; \
-})
-
-#define ALLOC_AND_GET(bufsizefunc, getfunc, structname) \
-	do { \
-		aux_space = bufsizefunc(up); \
-		if (aux_space < 0) \
-			return aux_space; \
-		up_native = ALLOC_USER_SPACE(sizeof(struct structname) + aux_space); \
-		aux_buf = up_native + sizeof(struct structname); \
-		err = getfunc(up_native, up, aux_buf, aux_space); \
-	} while (0)
-=======
 static int alloc_userspace(unsigned int size, u32 aux_space,
 			   void __user **up_native)
 {
@@ -1269,18 +998,13 @@ static int alloc_userspace(unsigned int size, u32 aux_space,
 		return -EFAULT;
 	return 0;
 }
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 
 static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	void __user *up = compat_ptr(arg);
 	void __user *up_native = NULL;
 	void __user *aux_buf;
-<<<<<<< HEAD
-	int aux_space;
-=======
 	u32 aux_space;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 	int compatible_arg = 1;
 	long err = 0;
 
@@ -1319,49 +1043,30 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_STREAMOFF:
 	case VIDIOC_S_INPUT:
 	case VIDIOC_S_OUTPUT:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(unsigned __user));
-		if (convert_in_user((compat_uint_t __user *)up,
-					(unsigned __user *) up_native))
-			return -EFAULT;
-=======
 		err = alloc_userspace(sizeof(unsigned int), 0, &up_native);
 		if (!err && assign_in_user((unsigned int __user *)up_native,
 					   (compat_uint_t __user *)up))
 			err = -EFAULT;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_G_INPUT:
 	case VIDIOC_G_OUTPUT:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(unsigned __user));
-=======
 		err = alloc_userspace(sizeof(unsigned int), 0, &up_native);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_G_EDID:
 	case VIDIOC_S_EDID:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(struct v4l2_edid));
-		err = get_v4l2_edid32(up_native, up);
-=======
 		err = alloc_userspace(sizeof(struct v4l2_edid), 0, &up_native);
 		if (!err)
 			err = get_v4l2_edid32(up_native, up);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_G_FMT:
 	case VIDIOC_S_FMT:
 	case VIDIOC_TRY_FMT:
-<<<<<<< HEAD
-		ALLOC_AND_GET(bufsize_v4l2_format32, get_v4l2_format32, v4l2_format);
-=======
 		err = bufsize_v4l2_format(up, &aux_space);
 		if (!err)
 			err = alloc_userspace(sizeof(struct v4l2_format),
@@ -1371,14 +1076,10 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 			err = get_v4l2_format32(up_native, up,
 						aux_buf, aux_space);
 		}
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_CREATE_BUFS:
-<<<<<<< HEAD
-		ALLOC_AND_GET(bufsize_v4l2_create32, get_v4l2_create32, v4l2_create_buffers);
-=======
 		err = bufsize_v4l2_create(up, &aux_space);
 		if (!err)
 			err = alloc_userspace(sizeof(struct v4l2_create_buffers),
@@ -1388,7 +1089,6 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 			err = get_v4l2_create32(up_native, up,
 						aux_buf, aux_space);
 		}
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
@@ -1396,9 +1096,6 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_QUERYBUF:
 	case VIDIOC_QBUF:
 	case VIDIOC_DQBUF:
-<<<<<<< HEAD
-		ALLOC_AND_GET(bufsize_v4l2_buffer32, get_v4l2_buffer32, v4l2_buffer);
-=======
 		err = bufsize_v4l2_buffer(up, &aux_space);
 		if (!err)
 			err = alloc_userspace(sizeof(struct v4l2_buffer),
@@ -1408,55 +1105,35 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 			err = get_v4l2_buffer32(up_native, up,
 						aux_buf, aux_space);
 		}
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_S_FBUF:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(struct v4l2_framebuffer));
-		err = get_v4l2_framebuffer32(up_native, up);
-=======
 		err = alloc_userspace(sizeof(struct v4l2_framebuffer), 0,
 				      &up_native);
 		if (!err)
 			err = get_v4l2_framebuffer32(up_native, up);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_G_FBUF:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(struct v4l2_framebuffer));
-=======
 		err = alloc_userspace(sizeof(struct v4l2_framebuffer), 0,
 				      &up_native);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_ENUMSTD:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(struct v4l2_standard));
-		err = get_v4l2_standard32(up_native, up);
-=======
 		err = alloc_userspace(sizeof(struct v4l2_standard), 0,
 				      &up_native);
 		if (!err)
 			err = get_v4l2_standard32(up_native, up);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
 	case VIDIOC_ENUMINPUT:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(struct v4l2_input));
-		err = get_v4l2_input32(up_native, up);
-=======
 		err = alloc_userspace(sizeof(struct v4l2_input), 0, &up_native);
 		if (!err)
 			err = get_v4l2_input32(up_native, up);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 
@@ -1475,11 +1152,7 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		compatible_arg = 0;
 		break;
 	case VIDIOC_DQEVENT:
-<<<<<<< HEAD
-		up_native = ALLOC_USER_SPACE(sizeof(struct v4l2_event));
-=======
 		err = alloc_userspace(sizeof(struct v4l2_event), 0, &up_native);
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		compatible_arg = 0;
 		break;
 	}
@@ -1519,14 +1192,9 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	case VIDIOC_S_OUTPUT:
 	case VIDIOC_G_INPUT:
 	case VIDIOC_G_OUTPUT:
-<<<<<<< HEAD
-		err = convert_in_user(((unsigned __user *)up_native),
-				(compat_uint_t __user *)up);
-=======
 		if (assign_in_user((compat_uint_t __user *)up,
 				   ((unsigned int __user *)up_native)))
 			err = -EFAULT;
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		break;
 
 	case VIDIOC_G_FBUF:
@@ -1538,10 +1206,6 @@ static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		break;
 
 	case VIDIOC_G_EDID:
-<<<<<<< HEAD
-	case VIDIOC_S_EDID:
-=======
->>>>>>> b78467189709... media: v4l2-compat-ioctl32.c: refactor compat ioctl32 logic
 		err = put_v4l2_edid32(up_native, up);
 		break;
 
