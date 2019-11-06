@@ -3,6 +3,12 @@
 # drivers/cmdq
 $(warning start to build cmdq normal)
 
+#ccflags-y := -Wno-bool-compare
+#ccflags-y := -Wno-memset-elt-size
+ccflags-y := -Wno-error=bool-compare
+ccflags-y := -Wno-error=memset-elt-size
+ccflags-y := -Wno-error
+
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/hv1/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/include/linux

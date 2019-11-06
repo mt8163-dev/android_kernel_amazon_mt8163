@@ -1,6 +1,9 @@
 # ---------------------------------------------------
 # Compile Options
 # ---------------------------------------------------
+
+ccflags-y := -Wno-stringop-overflow
+
 ccflags-y += -DLINUX -DMT6628
 
 ccflags-y += -DCFG_SUPPORT_AGPS_ASSIST=1

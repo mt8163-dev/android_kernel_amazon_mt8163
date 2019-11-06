@@ -1,3 +1,5 @@
+ccflags-y := -Wno-misleading-indentation
+
 obj-y += mt_spm.o
 obj-y += mt_spm_internal.o
 obj-$(CONFIG_ARCH_MT8163) += mt_sleep.o

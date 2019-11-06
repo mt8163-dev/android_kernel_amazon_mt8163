@@ -1,3 +1,5 @@
+ccflags-y := -Wno-misleading-indentation
+
 ifeq ($(CONFIG_DEPRECATED_MTK_SYSTRACKER_SUPPORT),y)
   obj-y += systracker.o
   obj-y += backtrace.o

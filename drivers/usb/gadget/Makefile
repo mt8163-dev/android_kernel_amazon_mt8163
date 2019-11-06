@@ -7,6 +7,8 @@ subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 
+ccflags-y := -Wno-misleading-indentation
+
 ccflags-$(CONFIG_MTK_C2K_SUPPORT) += -I$(srctree)/drivers/misc/mediatek/c2k_ccci/
 
 ccflags-$(CONFIG_USB_GADGET_DEBUG) := -DDEBUG
