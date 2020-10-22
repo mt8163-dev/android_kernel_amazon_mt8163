@@ -82,3 +82,9 @@ config MTK_DISP_HIDE_ERROR_LOGS
 	default n
 	help
 	  To hide display error logs
+
+config MTK_VIDEOX_CYNGN_LIVEDISPLAY
+	bool CONFIG_MTK_VIDEOX_CYNGN_LIVEDISPLAY
+	default n
+	help
+		Enable the RGB interface for color calibration.
