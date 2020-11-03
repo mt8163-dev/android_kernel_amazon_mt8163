@@ -22,6 +22,7 @@
  * formats. 
  */
 
+#include <linux/ksm.h>
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/fdtable.h>
