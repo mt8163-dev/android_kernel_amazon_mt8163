@@ -651,9 +651,6 @@ int mtk_p2p_cfg80211_scan(struct wiphy *wiphy,
 			prChannel = request->channels[u4Idx];
 
 			prRfChannelInfo->ucChannelNum = nicFreq2ChannelNum(prChannel->center_freq * 1000);
-			DBGLOG(P2P, TRACE,
-			       "Scanning Channel:%d,  freq: %d\n", prRfChannelInfo->ucChannelNum,
-				prChannel->center_freq);
 			switch (prChannel->band) {
 			case IEEE80211_BAND_2GHZ:
 				prRfChannelInfo->eBand = BAND_2G4;

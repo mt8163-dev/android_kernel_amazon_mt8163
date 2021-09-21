@@ -2632,11 +2632,6 @@ P_BSS_DESC_T scanSearchBssDescByPolicy(IN P_ADAPTER_T prAdapter, IN ENUM_NETWORK
 #endif
 
 			if (fgIsNeedToCheckTimeout == TRUE) {
-#ifdef CONFIG_MTK_WIFI_LOGGING_REDUCTION
-				DBGLOG(SCN, TRACE, "Ignore stale bss %pM\n", prBssDesc->aucBSSID);
-#else
-				DBGLOG(SCN, INFO, "Ignore stale bss %pM\n", prBssDesc->aucBSSID);
-#endif
 				continue;
 			}
 		}

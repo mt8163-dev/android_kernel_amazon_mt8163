@@ -11076,9 +11076,6 @@ batchSetCmd(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBuff
 				if (i4Ret)
 					DBGLOG(SCN, TRACE, "parse ucChannelNum error i4Ret=%d\n", i4Ret);
 				prRfChannelInfo->ucChannelNum = (UINT_8) u4Value;
-				DBGLOG(SCN, TRACE, "Scanning Channel:%d,  freq: %d\n",
-				       prRfChannelInfo->ucChannelNum,
-				       nicChannelNum2Freq(prRfChannelInfo->ucChannelNum));
 				prRfChannelInfo->ucBand = prRfChannelInfo->ucChannelNum < 15 ? BAND_2G4 : BAND_5G;
 
 				rCmdBatchReq.ucChannelListNum++;

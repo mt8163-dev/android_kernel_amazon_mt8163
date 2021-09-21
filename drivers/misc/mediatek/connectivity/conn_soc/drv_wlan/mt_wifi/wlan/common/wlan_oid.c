@@ -10605,9 +10605,6 @@ batchSetCmd(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBuff
 
 				/* Translate Freq from MHz to channel number. */
 				prRfChannelInfo->ucChannelNum = kalStrtol(p2, NULL, 0);
-				DBGLOG(SCN, TRACE, "Scanning Channel:%u,  freq: %d\n",
-						    (UINT_32) prRfChannelInfo->ucChannelNum,
-						    (UINT_32) nicChannelNum2Freq(prRfChannelInfo->ucChannelNum));
 				prRfChannelInfo->ucBand = prRfChannelInfo->ucChannelNum < 15 ? BAND_2G4 : BAND_5G;
 
 				rCmdBatchReq.ucChannelListNum++;

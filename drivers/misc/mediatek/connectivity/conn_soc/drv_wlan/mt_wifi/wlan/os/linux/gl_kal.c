@@ -4456,8 +4456,6 @@ WLAN_STATUS kalGetScanRequestChannelList(IN P_GLUE_INFO_T prGlueInfo,
 
 			prChannel = prScanRequest->channels[u4Idx];
 			arChnlInfoList[u4Idx].ucChannelNum = nicFreq2ChannelNum(prChannel->center_freq * 1000);
-			DBGLOG(SCN, INFO, "Scanning Channel:%d,  freq: %d\n",
-					   arChnlInfoList[u4Idx].ucChannelNum, prChannel->center_freq);
 
 			switch (prChannel->band) {
 			case IEEE80211_BAND_2GHZ:
