@@ -3620,7 +3620,7 @@ static void mt_battery_thermal_check(void)
 		/* ignore default rule */
 		if (BMT_status.temperature <= -10) {
 			pr_notice("[Battery] Tbat(%d)<= -10, system need power down.\n", BMT_status.temperature);
-			life_cycle_set_thermal_shutdown_reason(THERMAL_SHUTDOWN_REASON_BATTERY);
+			//life_cycle_set_thermal_shutdown_reason(THERMAL_SHUTDOWN_REASON_BATTERY);
 			orderly_poweroff(true);
 		}
 #else
