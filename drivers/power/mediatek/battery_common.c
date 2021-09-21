@@ -3268,12 +3268,6 @@ void mt_battery_GetBatteryData(void)
 
 	if (g_battery_soc_ready == false)
 		g_battery_soc_ready = true;
-
-	pr_notice(
-		    "AvgVbat=(%d),bat_vol=(%d),AvgI=(%d),I=(%d),VChr=(%d),AvgT=(%d),T=(%d),pre_SOC=(%d),SOC=(%d),ZCV=(%d)\n",
-		    BMT_status.bat_vol, bat_vol, BMT_status.ICharging, ICharging,
-		    BMT_status.charger_vol, BMT_status.temperature, temperature,
-		    previous_SOC, BMT_status.SOC, BMT_status.ZCV);
 }
 
 static PMU_STATUS mt_battery_CheckBatteryTemp(void)
@@ -4209,9 +4203,6 @@ void BAT_thread(void)
 			log_to_metrics(ANDROID_LOG_INFO, "battery", buf);
 #endif
 		}
-
-		pr_notice("total_time_plug_in(%lu), cv(%d)\r\n",
-			total_time_plug_in, g_custom_charging_cv);
 
 		mt_battery_CheckBatteryStatus();
 		mt_battery_charging_algorithm();

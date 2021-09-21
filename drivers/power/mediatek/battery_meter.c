@@ -2792,19 +2792,9 @@ void oam_run(void)
 		oam_d_4_pre = oam_d_4;
 	}
 
-	pr_debug("[oam_run] %d,%d,%d,%d,%d,%d,%d,%d\n",
-		 d5_count, d5_count_time, oam_d_3_pre, oam_d_3, oam_d_4_pre, oam_d_4, oam_d_5,
-		 charging_current);
-
 	if (oam_run_i == 0) {
-		pr_debug(
-			 "[oam_run] oam_i_1,oam_i_2,oam_car_1,oam_car_2,oam_d_1,oam_d_2,oam_v_ocv_1,oam_d_3,oam_r_1,oam_v_ocv_2,oam_r_2,vol_bat,g_vol_bat_hw_ocv,g_d_hw_ocv\n");
 		oam_run_i = 1;
 	}
-
-	pr_notice("[oam_run] %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-		 oam_i_1, oam_i_2, oam_car_1, oam_car_2, oam_d_1, oam_d_2, oam_v_ocv_1, oam_d_3,
-		 oam_r_1, oam_v_ocv_2, oam_r_2, vol_bat, g_vol_bat_hw_ocv, g_d_hw_ocv);
 
 	pr_debug("[oam_total] %d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		 gFG_capacity_by_c, gFG_capacity_by_v, gfg_percent_check_point,
@@ -3954,10 +3944,6 @@ signed int battery_meter_trans_battery_percentage(signed int d_val)
 		d_val = 100;
 	else if (d_val < 0)
 		d_val = 0;
-
-	pr_notice("[battery_meter_trans_battery_percentage] %d,%d,%d,%d,%d,%d,%d\r\n",
-		temp_val, C_0mA, C_600mA, d_val_before,
-		d_val, g_currentfactor, gFG_Is_Charging);
 
 	return d_val;
 }
