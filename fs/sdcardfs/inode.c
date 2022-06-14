@@ -215,6 +215,9 @@ static int sdcardfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 	struct fs_struct *copied_fs;
 	struct qstr q_obb = QSTR_LITERAL("obb");
 	struct qstr q_data = QSTR_LITERAL("data");
+#ifdef CONFIG_SDCARD_FS_DIR_WRITER
+	uid_t writer_uid = current_fsuid().val;
+#endif
 
 	if (!check_caller_access_to_name(dir, &dentry->d_name)) {
 		err = -EACCES;
@@ -325,6 +328,10 @@ static int sdcardfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 			goto out;
 		}
 	}
+#ifdef CONFIG_SDCARD_FS_DIR_WRITER
+	if (pd->perm < PERM_ANDROID)
+		sdcardfs_update_xattr_dirwriter(lower_dentry, writer_uid);
+#endif
 out:
 	task_lock(current);
 	current->fs = saved_fs;
@@ -556,11 +563,22 @@ static int sdcardfs_permission(struct vfsmount *mnt, struct inode *inode, int ma
 	struct inode tmp;
 	struct sdcardfs_inode_data *top = top_data_get(SDCARDFS_I(inode));
 
+#ifdef CONFIG_MULTISPACE_FEATURE_ENABLED
+	uid_t cred_userid;
+	uid_t inode_userid;
+#endif
+
 	if (IS_ERR(mnt))
 		return PTR_ERR(mnt);
 	if (!top)
 		return -EINVAL;
 
+
+#ifdef CONFIG_MULTISPACE_FEATURE_ENABLED
+	/* multispace convert appid to uid */
+	cred_userid = __kuid_val(current_cred()->fsuid) / AID_USER_OFFSET;
+	inode_userid = __kuid_val(inode->i_uid) / AID_USER_OFFSET;
+#endif
 	/*
 	 * Permission check on sdcardfs inode.
 	 * Calling process should have AID_SDCARD_RW permission
@@ -575,6 +593,20 @@ static int sdcardfs_permission(struct vfsmount *mnt, struct inode *inode, int ma
 	copy_attrs(&tmp, inode);
 	tmp.i_uid = make_kuid(&init_user_ns, top->d_uid);
 	tmp.i_gid = make_kgid(&init_user_ns, get_gid(mnt, inode->i_sb, top));
+#ifdef CONFIG_MULTISPACE_FEATURE_ENABLED
+	/* multispace allow uid >= 900 to access files of uid 0 */
+	if ((cred_userid >= 900 && cred_userid <= 999) &&
+		(inode_userid == 0 ||
+			(inode_userid >= 900 && inode_userid <= 999))) {
+		tmp.i_gid = current_cred()->fsgid;
+	}
+	/* multispace allow uid 0 to access files of uid >= 900 */
+	if (cred_userid == 0 && ((inode_userid >= 900 && inode_userid <= 999) ||
+		((SDCARDFS_I(inode)->data->userid) >= 900 &&
+			(SDCARDFS_I(inode)->data->userid) <= 999))) {
+		tmp.i_gid = current_cred()->fsgid;
+	}
+#endif
 	tmp.i_mode = (inode->i_mode & S_IFMT)
 			| get_mode(mnt, SDCARDFS_I(inode), top);
 	data_put(top);
@@ -777,6 +809,44 @@ out:
 	sdcardfs_put_lower_path(dentry, &lower_path);
 	return err;
 }
+
+#ifdef CONFIG_SDCARD_FS_PARTIAL_RELATIME
+void sdcardfs_update_relatime_flag(struct file *lower_file,
+	struct inode *lower_inode)
+{
+	struct dentry *dentry, *parent;
+	char xattr_value[16];
+	const char *xattr_name = "user.relatime";
+	__u32 flags = 0;
+
+	dentry = lower_file->f_path.dentry;
+	if (!dentry)
+		return;
+
+	while (1) {
+		parent = dget_parent(dentry);
+		if (!parent)
+			break;
+		if (vfs_getxattr(parent, xattr_name,
+			(void *)xattr_value, sizeof(xattr_value)) &&
+			xattr_value[0] == '1') {
+			dput(parent);
+			flags = S_RELATIME;
+			break;
+		} else if (IS_ROOT(parent)) {
+			dput(parent);
+			break;
+		}
+		dentry = parent;
+		dput(parent);
+	}
+
+	spin_lock(&lower_inode->i_lock);
+	lower_inode->i_flags &= ~S_RELATIME;
+	lower_inode->i_flags |= flags;
+	spin_unlock(&lower_inode->i_lock);
+}
+#endif
 
 const struct inode_operations sdcardfs_symlink_iops = {
 	.permission2	= sdcardfs_permission,
