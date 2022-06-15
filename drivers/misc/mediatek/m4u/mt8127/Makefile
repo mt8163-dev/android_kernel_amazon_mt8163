@@ -11,14 +11,9 @@
 # GNU General Public License for more details.
 #
 
-obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-
-obj-$(CONFIG_ARCH_MT6570) += 2.0/
-obj-$(CONFIG_ARCH_MT6580) += 2.0/
-obj-$(CONFIG_ARCH_MT6735) += 2.0/
-obj-$(CONFIG_ARCH_MT6735M) += 2.0/
-obj-$(CONFIG_ARCH_MT6753) += 2.0/
-obj-$(CONFIG_ARCH_MT6755) += 2.0/
-obj-$(CONFIG_ARCH_MT6797) += 2.0/
-obj-$(CONFIG_ARCH_MT6757) += 2.0/
-obj-$(CONFIG_ARCH_ELBRUS) += 2.0/
+ccflags-y += -I$(srctree)/include/trustzone
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/variant
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/dispsys/$(subst ",,$(CONFIG_MTK_PLATFORM))
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/mmp
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(subst ",,$(CONFIG_MTK_PLATFORM))/dispsys
+obj-y += m4u.o m4u_kernel.o m4u_priv.o

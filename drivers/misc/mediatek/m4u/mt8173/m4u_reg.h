@@ -11,34 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _MT8163_M4U_REG_H__
-#define _MT8163_M4U_REG_H__
-
-#ifdef CONFIG_MTK_GPU_SAPPHIRE_LITE
-#define M4U_INHOUSE_GPU_EN  1
-#else
-/*other's GPU has its own iommu*/
-#define M4U_INHOUSE_GPU_EN  0
-#endif
-
-#if M4U_INHOUSE_GPU_EN
-#define TOTAL_M4U_NUM     3
-#else
-#define TOTAL_M4U_NUM     2
-#endif
-
-#define M4U_BASE0                0xf0205000
-#define M4U_BASE1                0xf0214000
-
-#define LARB0_BASE	0xf7001000
-#define LARB1_BASE	0xf6010000
-#define LARB2_BASE	0xf4017000
-#define LARB3_BASE	0xf4018000
-#define LARB4_BASE	0xf5001000
-
-/* smi_common register is in mmsys domain */
-/* needs to call smi_common_clock_on/off when access these registers */
-#define SMI_COMMON_EXT_BASE 0xf4022000
+#ifndef _MT8173_M4U_REG_H__
+#define _MT8173_M4U_REG_H__
 
 /* ================================================= */
 /* common macro definitions */
@@ -60,8 +34,8 @@
 
 
 #define REG_MMU_PROG_EN                 0x10
-#define F_MMU0_PROG_EN               1
-
+#define F_MMU0_PROG_EN                  1
+#define F_MMU1_PROG_EN                  2
 #define REG_MMU_PROG_VA                 0x14
 #define F_PROG_VA_LOCK_BIT             (1<<11)
 #define F_PROG_VA_LAYER_BIT            F_BIT_SET(9)
@@ -73,9 +47,9 @@
 
 #define REG_MMU_INVLD		 (0x20)
 #define F_MMU_INV_ALL		 0x2
-#define F_MMU_INV_RANGE	 0x1
+#define F_MMU_INV_RANGE		 0x1
 
-#define REG_MMU_INVLD_SA		 (0x24)
+#define REG_MMU_INVLD_SA	 (0x24)
 #define REG_MMU_INVLD_EA          (0x28)
 
 
@@ -86,9 +60,9 @@
 #define REG_MMU_INVLD_SA_SEC        (0x30)
 #define REG_MMU_INVLD_EA_SEC        (0x34)
 
-#define REG_INVLID_SEL		 (0x38)
-#define F_MMU_INV_EN_L1	 (1<<0)
-#define F_MMU_INV_EN_L2	 (1<<1)
+#define REG_INVLID_SEL			 (0x38)
+#define F_MMU_INV_EN_L1		 (1<<0)
+#define F_MMU_INV_EN_L2		 (1<<1)
 
 
 #define REG_INVLID_SEL_SEC          (0x3c)
@@ -137,13 +111,12 @@
 
 #define REG_MMU_READ_ENTRY       0x100
 #define F_READ_ENTRY_EN                 F_BIT_SET(31)
+    #define F_READ_ENTRY_MM1_MAIN           F_BIT_SET(26)
 #define F_READ_ENTRY_MM0_MAIN           F_BIT_SET(25)
 #define F_READ_ENTRY_MMx_MAIN(id)       F_BIT_SET(25+id)
 #define F_READ_ENTRY_PFH                F_BIT_SET(24)
 #define F_READ_ENTRY_MAIN_IDX(idx)      F_VAL(idx, 21, 16)
-#define F_READ_ENTRY_PFH_IDX(idx)       F_VAL(idx, 10, 5)
-    /* #define F_READ_ENTRY_PFH_HI_LO(high)    F_VAL(high, 4,4) */
-    /* #define F_READ_ENTRY_PFH_PAGE(page)     F_VAL(page, 3,2) */
+#define F_READ_ENTRY_PFH_IDX(idx)       F_VAL(idx, 11, 5)
 #define F_READ_ENTRY_PFH_PAGE_IDX(idx)    F_VAL(idx, 4, 2)
 #define F_READ_ENTRY_PFH_WAY(way)       F_VAL(way, 1, 0)
 
@@ -151,9 +124,9 @@
 
 #define REG_MMU_PFH_TAG_RDATA    0x108
 #define F_PFH_TAG_VA_GET(mmu, tag)    ((mmu == 0)?F_MMU0_PFH_TAG_VA_GET(tag) : F_MMU1_PFH_TAG_VA_GET(tag))
-#define F_MMU0_PFH_TAG_VA_GET(tag)    (F_MSK_SHIFT(tag, 14, 4)<<(MMU_SET_MSB_OFFSET(0)+1))
-#define F_MMU1_PFH_TAG_VA_GET(tag)    (F_MSK_SHIFT(tag, 15, 4)<<(MMU_SET_MSB_OFFSET(1)+1))
-#define F_MMU_PFH_TAG_VA_LAYER0_MSK(mmu)  ((mmu = 0)?F_MSK(31, 29):F_MSK(31, 28))
+    #define F_MMU0_PFH_TAG_VA_GET(tag)    (F_MSK_SHIFT(tag, 13, 4)<<(MMU_SET_MSB_OFFSET(0)+1))
+    #define F_MMU1_PFH_TAG_VA_GET(tag)    (F_MSK_SHIFT(tag, 14, 4)<<(MMU_SET_MSB_OFFSET(1)+1))
+    #define F_MMU_PFH_TAG_VA_LAYER0_MSK(mmu)  ((mmu = 0)?F_MSK(31, 30):F_MSK(31, 29))
 #define F_PFH_TAG_LAYER_BIT         F_BIT_SET(3)
 #define F_PFH_TAG_16X_BIT           F_BIT_SET(2)	/* this bit is always 0 -- cost down. */
 #define F_PFH_TAG_SEC_BIT           F_BIT_SET(1)
@@ -203,27 +176,29 @@
 #define F_INT_L2_MISS_FIFO_ERR                     F_BIT_SET(6)
 
 #define REG_MMU_INT_MAIN_CONTROL    0x124
-#define F_INT_TRANSLATION_FAULT(MMU)                 F_BIT_SET(0+(((MMU)<<1)|((MMU)<<2)))
-#define F_INT_MAIN_MULTI_HIT_FAULT(MMU)              F_BIT_SET(1+(((MMU)<<1)|((MMU)<<2)))
-#define F_INT_INVALID_PHYSICAL_ADDRESS_FAULT(MMU)    F_BIT_SET(2+(((MMU)<<1)|((MMU)<<2)))
-#define F_INT_ENTRY_REPLACEMENT_FAULT(MMU)           F_BIT_SET(3+(((MMU)<<1)|((MMU)<<2)))
-#define F_INT_TLB_MISS_FAULT(MMU)                    F_BIT_SET(4+(((MMU)<<1)|((MMU)<<2)))
-#define F_INT_MISS_FIFO_ERR(MMU)                     F_BIT_SET(5+(((MMU)<<1)|((MMU)<<2)))
-#define F_INT_PFH_FIFO_ERR(MMU)                      F_BIT_SET(6+(((MMU)<<1)|((MMU)<<2)))
+#define F_INT_TRANSLATION_FAULT(MMU)                 F_BIT_SET(0+(MMU)*7)
+#define F_INT_MAIN_MULTI_HIT_FAULT(MMU)              F_BIT_SET(1+(MMU)*7)
+#define F_INT_INVALID_PHYSICAL_ADDRESS_FAULT(MMU)    F_BIT_SET(2+(MMU)*7)
+#define F_INT_ENTRY_REPLACEMENT_FAULT(MMU)           F_BIT_SET(3+(MMU)*7)
+#define F_INT_TLB_MISS_FAULT(MMU)                    F_BIT_SET(4+(MMU)*7)
+#define F_INT_MISS_FIFO_ERR(MMU)                     F_BIT_SET(5+(MMU)*7)
+#define F_INT_PFH_FIFO_ERR(MMU)                      F_BIT_SET(6+(MMU)*7)
 
-#define F_INT_MAU(mmu, set)     F_BIT_SET(7+(set)+(mmu<<2))	/* (14+(set)+(mmu*4)) */
+#define F_INT_MAU(mmu, set)     F_BIT_SET(14+(set)+(mmu<<2)) /*(14+(set)+(mmu*4))*/
 
 #define F_INT_MMU0_MAIN_MSK          F_MSK(6, 0)
-#define F_INT_MMU0_MAU_MSK           F_MSK(10, 7)
+#define F_INT_MMU1_MAIN_MSK          F_MSK(13, 7)
+#define F_INT_MMU0_MAU_MSK           F_MSK(17, 14)
+#define F_INT_MMU1_MAU_MSK           F_MSK(21, 18)
 
 #define REG_MMU_CPE_DONE_SEC    0x128
 #define REG_MMU_CPE_DONE        0x12C
 
 #define REG_MMU_L2_FAULT_ST         0x130
-#define F_INT_L2_PFH_OUT_FIFO_ERROR                   F_BIT_SET(5)
-#define F_INT_L2_PFH_IN_FIFO_ERROR                    F_BIT_SET(6)
-#define F_INT_L2_MISS_OUT_FIFO_ERROR             F_BIT_SET(7)
-#define F_INT_L2_MISS_IN_FIFO_ERR                     F_BIT_SET(8)
+#define F_INT_L2_PFH_OUT_FIFO_ERROR       F_BIT_SET(5)
+#define F_INT_L2_PFH_IN_FIFO_ERROR        F_BIT_SET(6)
+#define F_INT_L2_MISS_OUT_FIFO_ERROR      F_BIT_SET(7)
+#define F_INT_L2_MISS_IN_FIFO_ERR         F_BIT_SET(8)
 #define REG_MMU_MAIN_FAULT_ST       0x134
 
 #define REG_MMU_TBWALK_FAULT_VA         0x138
@@ -238,7 +213,6 @@
 #define REG_MMU_INVLD_PA(mmu)         (0x140+((mmu)<<3))
 #define REG_MMU_INT_ID(mmu)             (0x150+((mmu)<<2))
 #define F_MMU0_INT_ID_TF_MSK        (~0x3)	/* only for MM iommu. */
-#define F_MMU1_INT_ID_TF_MSK        (0x7f)	/* only for perisys iommu. */
 
 #define REG_MMU_PF_MSCNT            0x160
 #define REG_MMU_PF_CNT              0x164
@@ -279,8 +253,8 @@
 #define F_MAIN_TLB_SEC_BIT          F_BIT_SET(7)
 #define F_MAIN_TLB_INV_DES_BIT      (1<<6)
 #define F_MAIN_TLB_SQ_EN_BIT        (1<<5)
-#define F_MAIN_TLB_SQ_INDEX_MSK     F_MSK(4, 2)
-#define F_MAIN_TLB_SQ_INDEX_GET(regval)     F_MSK_SHIFT(regval, 4, 2)
+#define F_MAIN_TLB_SQ_INDEX_MSK     F_MSK(4, 1)
+#define F_MAIN_TLB_SQ_INDEX_GET(regval)     F_MSK_SHIFT(regval, 4, 1)
 
 
 #define REG_MMU_MAU_START(mmu, mau)              (0x900+((mau)*0x20)+((mmu)*0xa0))
@@ -306,8 +280,9 @@
 #define REG_MMU_MAU_ASSERT_ST(mmu)                (0x994+((mmu)*0xa0))
 
 #define REG_MMU_PFH_VLD_0   (0x180)
-#define REG_MMU_PFH_VLD(mmu, set, way)	(REG_MMU_PFH_VLD_0+(((set)>>5)<<2)\
-					+((way)<<((mmu == 0)?(MMU0_SET_ORDER - 3):(MMU1_SET_ORDER - 3))))
+#define REG_MMU_PFH_VLD(mmu, set, way)     (REG_MMU_PFH_VLD_0+\
+				(((set)>>5)<<2)+\
+				((way)<<((mmu == 0)?(MMU0_SET_ORDER - 3):(MMU1_SET_ORDER - 3))))
 #define F_MMU_PFH_VLD_BIT(set, way)      F_BIT_SET((set)&0x1f)	/* set%32 */
 
 
@@ -331,10 +306,7 @@
 #define REG_PERIAXI_BUS_CTL3   (0x208)
 #define F_PERI_MMU_EN(port, en)       ((en)<<((port)))
 
-
-
 #include <mt-plat/sync_write.h>
-
 
 static inline unsigned int COM_ReadReg32(unsigned long addr)
 {
@@ -356,12 +328,6 @@ static inline unsigned int M4U_ReadReg32(unsigned long M4uBase, unsigned int Off
 
 static inline void M4U_WriteReg32(unsigned long M4uBase, unsigned int Offset, unsigned int Val)
 {
-#if M4U_INHOUSE_GPU_EN
-	extern m4u_regwrite_callback_t *gRegWrite;
-	extern unsigned long gM4UBaseAddr[TOTAL_M4U_NUM];
-	if (gRegWrite && M4uBase == gM4UBaseAddr[2])	/*only for gpu test */
-		gRegWrite((M4uBase + Offset), Val);
-#endif
 	COM_WriteReg32((M4uBase + Offset), Val);
 }
 
@@ -381,5 +347,8 @@ static inline unsigned int m4uHw_get_field_by_mask(unsigned long M4UBase, unsign
 {
 	return M4U_ReadReg32(M4UBase, reg) & mask;
 }
+
+
+
 
 #endif

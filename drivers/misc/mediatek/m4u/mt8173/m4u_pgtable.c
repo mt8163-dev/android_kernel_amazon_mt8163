@@ -14,7 +14,6 @@
 #include <asm/cacheflush.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
-/* #include <mach/mt_irq.h> */
 
 #include "m4u_priv.h"
 
@@ -105,7 +104,7 @@ static inline unsigned int m4u_get_pt_type_size(int type)
 
 /***********************************************************/
 /** print pte info to log or sequncial file
-    if data is NULL, info is out put to kernel log by print
+    if data is NULL, info is out put to kernel log by pr_debug
     if pte is valid, we will print like va->pgd->pte->pa
     if pte is invalid, we print as many info as we can.
 * @return NULL
@@ -227,9 +226,10 @@ void *m4u_for_each_pte(m4u_domain_t *domain, m4u_pte_fn_t *fn, void *data)
 			}
 		}
 
-		if (mva + pte_info.size < mva)	/* over flow */
+		if (mva + pte_info.size >= mva)	/* over flow */
+			mva += pte_info.size;
+		else
 			break;
-		mva += pte_info.size;
 	}
 
 	read_unlock_domain(domain);
@@ -238,7 +238,7 @@ void *m4u_for_each_pte(m4u_domain_t *domain, m4u_pte_fn_t *fn, void *data)
 
 /* dump pte info for mva, no matter it's valid or not */
 /* this function doesn't lock pgtable lock. */
-int m4u_dump_pte_nolock(m4u_domain_t *domain, unsigned int mva)
+unsigned long m4u_dump_pte_nolock(m4u_domain_t *domain, unsigned int mva)
 {
 	m4u_pte_info_t pte_info;
 
@@ -317,8 +317,6 @@ static inline unsigned int __m4u_get_pgd_attr_16M(unsigned int prot)
 	pgprot |= (prot & M4U_PROT_SEC) ? 0 : F_PGD_NS_BIT_SECTION(1);
 	pgprot |= (prot & M4U_PROT_SHARE) ? F_PGD_S_BIT : 0;
 	pgprot |= (prot & M4U_PROT_CACHE) ? (F_PGD_C_BIT | F_PGD_B_BIT) : 0;
-	if (gM4U_4G_DRAM_Mode)
-		pgprot |= F_PGD_BIT32_BIT;
 	return pgprot;
 }
 
@@ -330,8 +328,6 @@ static inline unsigned int __m4u_get_pgd_attr_1M(unsigned int prot)
 	pgprot |= (prot & M4U_PROT_SEC) ? 0 : F_PGD_NS_BIT_SECTION(1);
 	pgprot |= (prot & M4U_PROT_SHARE) ? F_PGD_S_BIT : 0;
 	pgprot |= (prot & M4U_PROT_CACHE) ? (F_PGD_C_BIT | F_PGD_B_BIT) : 0;
-	if (gM4U_4G_DRAM_Mode)
-		pgprot |= F_PGD_BIT32_BIT;
 	return pgprot;
 }
 
@@ -351,8 +347,6 @@ static inline unsigned int __m4u_get_pte_attr_64K(unsigned int prot)
 	pgprot = F_PTE_TYPE_LARGE;
 	pgprot |= (prot & M4U_PROT_SHARE) ? F_PTE_S_BIT : 0;
 	pgprot |= (prot & M4U_PROT_CACHE) ? (F_PGD_C_BIT | F_PGD_B_BIT) : 0;
-	if (gM4U_4G_DRAM_Mode)
-		pgprot |= F_PTE_BIT32_BIT;
 	return pgprot;
 }
 
@@ -363,8 +357,6 @@ static inline unsigned int __m4u_get_pte_attr_4K(unsigned int prot)
 	pgprot = F_PTE_TYPE_SMALL;
 	pgprot |= (prot & M4U_PROT_SHARE) ? F_PTE_S_BIT : 0;
 	pgprot |= (prot & M4U_PROT_CACHE) ? (F_PGD_C_BIT | F_PGD_B_BIT) : 0;
-	if (gM4U_4G_DRAM_Mode)
-		pgprot |= F_PTE_BIT32_BIT;
 	return pgprot;
 }
 
@@ -420,8 +412,9 @@ int m4u_clean_pte(m4u_domain_t *domain, unsigned int mva, unsigned int size)
 struct kmem_cache *gM4u_pte_kmem = NULL;
 int m4u_pte_allocator_init(void)
 {
-	gM4u_pte_kmem = kmem_cache_create("m4u_pte", IMU_BYTES_PER_PTE, IMU_BYTES_PER_PTE, 0, NULL);
-	M4UINFO("%s: gM4u_pte_kmem = 0x%p, IMU_BYTES_PER_PTE = 0x%zx\n", __func__,
+	gM4u_pte_kmem = kmem_cache_create("m4u_pte", IMU_BYTES_PER_PTE, IMU_BYTES_PER_PTE,
+					  SLAB_CACHE_DMA, NULL);
+	M4UINFO("%s: gM4u_pte_kmem = 0x%p, IMU_BYTES_PER_PTE = 0x%lx\n", __func__,
 		gM4u_pte_kmem, IMU_BYTES_PER_PTE);
 
 	if (IS_ERR_OR_NULL(gM4u_pte_kmem)) {
@@ -452,7 +445,11 @@ int m4u_alloc_pte(m4u_domain_t *domain, imu_pgd_t *pgd, unsigned int pgprot)
 	/* pte_new_va = (unsigned int)kzalloc(IMU_BYTES_PER_PTE, GFP_KERNEL); */
 	/* pte_new_va = (unsigned int)get_zeroed_page(GFP_KERNEL); */
 	write_unlock_domain(domain);
-	pte_new_va = kmem_cache_zalloc(gM4u_pte_kmem, GFP_KERNEL);
+	pte_new_va = kmem_cache_zalloc(gM4u_pte_kmem, GFP_KERNEL | GFP_DMA);
+	/*
+	 * Need to make sure that the pte value modification are proctected in
+	 * the same domain lock.
+	 */
 	write_lock_domain(domain);
 	if (unlikely(!pte_new_va)) {
 		m4u_aee_print("%s: fail, nomemory\n", __func__);
@@ -460,10 +457,10 @@ int m4u_alloc_pte(m4u_domain_t *domain, imu_pgd_t *pgd, unsigned int pgprot)
 	}
 	pte_new = __pa(pte_new_va);
 
-	/* check again in case someone else may have allocated for this pgd first */
+	/* check again, in case someone else may have allocated for this pgd first.*/
 	if (likely(!imu_pgd_val(*pgd))) {
 		m4u_set_pgd_val(pgd, (unsigned int)(pte_new) | pgprot);
-		M4ULOG_LOW("%s: pgd: 0x%p, pte_va:0x%p, pte_pa: 0x%lx, value: 0x%x\n",
+		M4ULOG_MID("%s: pgd: 0x%p, pte_va:0x%p, pte_pa: 0x%lx, value: 0x%x\n",
 			   __func__, pgd, pte_new_va,
 			   (unsigned long)pte_new, (unsigned int)(pte_new) | pgprot);
 
@@ -518,8 +515,8 @@ int m4u_map_16M(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, un
 
 	write_lock_domain(m4u_domain);
 	mva &= F_PGD_PA_SUPERSECTION_MSK;
-	if (pa > 0xffffffffL)
-		padscpt = (unsigned int)pa & (F_PTE_PA_SMALL_MSK | F_PGD_BIT32_BIT);
+	if (gM4U_4G_DRAM_Mode)
+		padscpt = (unsigned int)(pa & F_PGD_PA_SUPERSECTION_MSK) | F_PGD_BIT32_BIT;
 	else
 		padscpt = (unsigned int)pa & F_PGD_PA_SUPERSECTION_MSK;
 
@@ -527,7 +524,8 @@ int m4u_map_16M(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, un
 	pgd = imu_pgd_offset(m4u_domain, mva);
 
 	M4ULOG_LOW("%s: mva: 0x%x, pgd: 0x%p (0x%p + 0x%x), pa: 0x%lx, value: 0x%x\n",
-		   __func__, mva, pgd, (m4u_domain)->pgd, imu_pgd_index(mva), pa, padscpt | pgprot);
+		   __func__, mva, pgd, (m4u_domain)->pgd, imu_pgd_index(mva),
+		   pa, padscpt | pgprot);
 
 	for (i = 0; i < 16; i++) {
 		if (unlikely(imu_pgd_val(*pgd))) {
@@ -541,7 +539,7 @@ int m4u_map_16M(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, un
 	write_unlock_domain(m4u_domain);
 	return 0;
 
-err_out:
+ err_out:
 	for (pgd--; i > 0; i--) {
 		m4u_set_pgd_val(pgd, 0);
 		pgd--;
@@ -563,8 +561,8 @@ int m4u_map_1M(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, uns
 
 	write_lock_domain(m4u_domain);
 	mva &= F_PGD_PA_SECTION_MSK;
-	if (pa > 0xffffffffL)
-		padscpt = (unsigned int)pa & (F_PTE_PA_SMALL_MSK | F_PGD_BIT32_BIT);
+	if (gM4U_4G_DRAM_Mode)
+		padscpt = (unsigned int)(pa & F_PGD_PA_SECTION_MSK) | F_PGD_BIT32_BIT;
 	else
 		padscpt = (unsigned int)pa & F_PGD_PA_SECTION_MSK;
 
@@ -580,8 +578,8 @@ int m4u_map_1M(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, uns
 	m4u_set_pgd_val(pgd, padscpt | pgprot);
 
 	M4ULOG_LOW("%s: mva: 0x%x, pgd: 0x%p (0x%p + 0x%x), pa: 0x%lx, value: 0x%x\n",
-		   __func__, mva, pgd, (m4u_domain)->pgd, imu_pgd_index(mva), pa, padscpt | pgprot);
-
+		   __func__, mva, pgd, (m4u_domain)->pgd, imu_pgd_index(mva),
+		   pa, padscpt | pgprot);
 	write_unlock_domain(m4u_domain);
 	return 0;
 }
@@ -602,8 +600,8 @@ int m4u_map_64K(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, un
 
 	write_lock_domain(m4u_domain);
 	mva &= F_PTE_PA_LARGE_MSK;
-	if (pa > 0xffffffffL)
-		padscpt = (unsigned int)pa & (F_PTE_PA_SMALL_MSK | F_PTE_BIT32_BIT);
+	if (gM4U_4G_DRAM_Mode)
+		padscpt = (unsigned int)(pa & F_PTE_PA_LARGE_MSK) | F_PTE_BIT32_BIT;
 	else
 		padscpt = (unsigned int)pa & F_PTE_PA_LARGE_MSK;
 
@@ -643,18 +641,16 @@ int m4u_map_64K(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, un
 		imu_pte_val(pte[i]) = padscpt | pgprot;
 	}
 	imu_pte_unmap(pte);
-
 	write_unlock_domain(m4u_domain);
 	return 0;
 
-err_out:
+ err_out:
 	for (i--; i >= 0; i--)
 		imu_pte_val(pte[i]) = 0;
 	imu_pte_unmap(pte);
 
 	if (pte_new)
 		m4u_free_pte(m4u_domain, pgd);
-
 	write_unlock_domain(m4u_domain);
 	return -1;
 }
@@ -675,8 +671,8 @@ int m4u_map_4K(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, uns
 
 	write_lock_domain(m4u_domain);
 	mva &= F_PTE_PA_SMALL_MSK;
-	if (pa > 0xffffffffL)
-		padscpt = (unsigned int)pa & (F_PTE_PA_SMALL_MSK | F_PTE_BIT32_BIT);
+	if (gM4U_4G_DRAM_Mode)
+		padscpt = (unsigned int)(pa & F_PTE_PA_SMALL_MSK) | F_PTE_BIT32_BIT;
 	else
 		padscpt = (unsigned int)pa & F_PTE_PA_SMALL_MSK;
 
@@ -716,15 +712,15 @@ int m4u_map_4K(m4u_domain_t *m4u_domain, unsigned int mva, unsigned long pa, uns
 		   pa, padscpt | imu_pte_val(*pte));
 
 	imu_pte_unmap(pte);
+
 	write_unlock_domain(m4u_domain);
 	return 0;
 
-err_out:
-	imu_pte_unmap(pte);
+ err_out:
 
+	imu_pte_unmap(pte);
 	if (pte_new)
 		m4u_free_pte(m4u_domain, pgd);
-
 	write_unlock_domain(m4u_domain);
 	return -1;
 }
@@ -780,8 +776,8 @@ int m4u_map_phys_range(m4u_domain_t *m4u_domain, unsigned int iova,
 	 * size of the smallest page supported by the hardware
 	 */
 	if (!IS_ALIGNED(iova | (unsigned int)paddr | size, min_pagesz)) {
-		M4UMSG("unaligned: iova 0x%x pa 0x%lx size 0x%x min_pagesz 0x%x\n",
-		       iova, paddr, size, min_pagesz);
+		pr_err("unaligned: iova 0x%x pa 0x%lx size 0x%x min_pagesz 0x%x\n",
+			iova, paddr, size, min_pagesz);
 		return -EINVAL;
 	}
 
@@ -854,28 +850,27 @@ int m4u_map_sgtable(m4u_domain_t *m4u_domain, unsigned int mva,
 			len = sg->length;
 #endif
 
-		M4ULOG_LOW("%s: for_each_sg i: %d, len: %d, mva: 0x%x\n",
-			   __func__, i, len, map_mva);
+		M4ULOG_LOW("%s: for_each_sg i: %d, len: %d, mva: 0x%x\n", __func__, i, len,
+			   map_mva);
 
 
 		if (map_mva + len > map_end) {
-			M4UMSG("%s: map_mva(0x%x)+len(0x%x)>end(0x%x)\n",
-			       __func__, map_mva, len, map_end);
+			M4UMSG("%s: map_mva(0x%x)+len(0x%x)>end(0x%x)\n", __func__, map_mva,
+			       len, map_end);
 			break;
 		}
-		if (len == SZ_4K)	/* for most cases */
+		if (len == SZ_4K) { /* for most cases */
 			ret = m4u_map_4K(m4u_domain, map_mva, pa, prot);
-		else
+		} else {
 			ret = m4u_map_phys_range(m4u_domain, map_mva, pa, len, prot);
+		}
 
 		if (ret) {
-			M4UMSG
-			    ("%s: ret: %d, i: %d, sg->dma: 0x%lx, sg->phy: 0x%lx, sg->offset: 0x%x\n",
-			     __func__, ret, i, (unsigned long)sg_dma_address(sg),
-			     (unsigned long)sg_phys(sg), sg->offset);
+			M4UMSG("%s: ret: %d\n", __func__, ret);
 			goto err_out;
-		} else
+		} else {
 			map_mva += len;
+		}
 	}
 
 	if (map_mva < map_end) {
@@ -891,12 +886,14 @@ int m4u_map_sgtable(m4u_domain_t *m4u_domain, unsigned int mva,
 
 	return 0;
 
-err_out:
-	/* write_unlock_domain(m4u_domain); */
+ err_out:
+	/* write_unlock_domain(m4u_domain);*/
 
 	m4u_unmap(m4u_domain, mva, size);
 	return -EINVAL;
 }
+
+
 
 int m4u_check_free_pte(m4u_domain_t *domain, imu_pgd_t *pgd)
 {
@@ -904,7 +901,6 @@ int m4u_check_free_pte(m4u_domain_t *domain, imu_pgd_t *pgd)
 	int i;
 
 	pte = imu_pte_map(pgd);
-
 	for (i = 0; i < IMU_PTRS_PER_PTE; i++, pte++) {
 		if (imu_pte_val(*pte) != 0)
 			break;
@@ -913,8 +909,9 @@ int m4u_check_free_pte(m4u_domain_t *domain, imu_pgd_t *pgd)
 		m4u_free_pte(domain, pgd);
 		m4u_set_pgd_val(pgd, 0);
 		return 0;
-	} else
+	} else {
 		return 1;
+	}
 }
 
 int m4u_unmap(m4u_domain_t *domain, unsigned int mva, unsigned int size)
@@ -925,7 +922,6 @@ int m4u_unmap(m4u_domain_t *domain, unsigned int mva, unsigned int size)
 	unsigned long end_plus_1 = (unsigned long)mva + size;
 
 	write_lock_domain(domain);
-
 	do {
 		pgd = imu_pgd_offset(domain, mva);
 
@@ -966,14 +962,14 @@ int m4u_unmap(m4u_domain_t *domain, unsigned int mva, unsigned int size)
 		} else {
 			mva += MMU_SECTION_SIZE;
 		}
-	} while (mva < end_plus_1 && mva);	/*if the last mva is 0xfff00000, the new mva may be 0 */
+	} while (mva < end_plus_1 && mva);
 
 	m4u_invalid_tlb_by_range(domain, start, end_plus_1 - 1);
 
 	write_unlock_domain(domain);
-
 	return 0;
 }
+
 
 int m4u_debug_pgtable_show(struct seq_file *s, void *unused)
 {
@@ -999,19 +995,21 @@ int m4u_pgtable_init(struct m4u_device *m4u_dev, m4u_domain_t *m4u_domain)
 
 	/* ======= alloc pagetable======================= */
 	m4u_domain->pgd =
-	    dma_alloc_coherent(m4u_dev->pDev[0], M4U_PGD_SIZE, &(m4u_domain->pgd_pa), GFP_KERNEL);
+	    dma_alloc_coherent(m4u_dev->pDev[0], M4U_PGD_SIZE, &(m4u_domain->pgd_pa),
+				GFP_KERNEL | GFP_DMA);
 
 	if (!(m4u_domain->pgd)) {
 		M4UMSG("dma_alloc_coherent error!  dma memory not available.\n");
 		return -1;
 	}
 	if ((unsigned int)(m4u_domain->pgd_pa) & (M4U_PGD_SIZE - 1)) {
-		M4UMSG("dma_alloc_coherent memory not align. 0x%pad\n", &m4u_domain->pgd_pa);
+		M4UMSG("dma_alloc_coherent memory not align. 0x%lx\n",
+		       (unsigned long)m4u_domain->pgd_pa);
 		return -1;
 	}
 
-	M4UINFO("dma_alloc_coherent success! pgtva=0x%p, pgtpa=0x%pad\n", m4u_domain->pgd,
-		&m4u_domain->pgd_pa);
+	M4UINFO("dma_alloc_coherent success! pagetable_va=0x%lx, pagetable_pa=0x%lx.\n",
+		(unsigned long)m4u_domain->pgd, (unsigned long)m4u_domain->pgd_pa);
 
 	memset((void *)m4u_domain->pgd, 0, M4U_PGD_SIZE);
 	/* ======= alloc pagetable done======================= */
@@ -1019,8 +1017,8 @@ int m4u_pgtable_init(struct m4u_device *m4u_dev, m4u_domain_t *m4u_domain)
 	if (0 != m4u_pte_allocator_init())
 		return -1;
 
-	debugfs_create_file("pgtable", 0644,
-			    m4u_dev->debug_root, m4u_domain, &m4u_debug_pgtable_fops);
+	debugfs_create_file("pgtable", 0644, m4u_dev->debug_root, m4u_domain,
+			    &m4u_debug_pgtable_fops);
 
 	return 0;
 }

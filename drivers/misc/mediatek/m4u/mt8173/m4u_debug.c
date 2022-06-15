@@ -18,11 +18,11 @@
 #include <linux/module.h>
 
 #include "m4u_priv.h"
-
+#include "m4u_debug.h"
 
 /* global variables */
 int gM4U_log_to_uart = 2;
-int gM4U_log_level = 1;
+int gM4U_log_level = 2;
 
 
 int m4u_test_alloc_dealloc(int id, unsigned int size)
@@ -72,7 +72,6 @@ int m4u_test_alloc_dealloc(int id, unsigned int size)
 		if (ret)
 			M4UMSG("do_munmap failed\n");
 	}
-
 /* clean */
 	m4u_destroy_client(client);
 	return 0;
@@ -83,8 +82,8 @@ m4u_callback_ret_t m4u_test_callback(int alloc_port, unsigned int mva,
 				     unsigned int size, void *data)
 {
 	if (NULL != data)
-		M4UMSG("test callback port=%d, mva=0x%x, size=0x%x, data=0x%x\n",
-		       alloc_port, mva, size, *(int *)data);
+		M4UMSG("test callback port=%d, mva=0x%x, size=0x%x, data=0x%x\n", alloc_port, mva,
+		       size, *(int *)data);
 	else
 		M4UMSG("test callback port=%d, mva=0x%x, size=0x%x\n", alloc_port, mva, size);
 
@@ -135,7 +134,7 @@ int m4u_test_reclaim(unsigned int size)
 
 	m4u_unregister_reclaim_callback(M4U_PORT_DISP_OVL0);
 	m4u_unregister_reclaim_callback(M4U_PORT_AAO);
-	/* m4u_unregister_reclaim_callback(M4U_PORT_GCE); */
+	/*m4u_unregister_reclaim_callback(M4U_PORT_GCE);*/
 
 	return 0;
 }
@@ -180,9 +179,10 @@ static int m4u_test_map_kernel(void)
 		return -1;
 	}
 	for (i = 0; i < size; i += 4) {
-		if (*(int *)(kernel_va + i) != i)
+		if (*(int *)(kernel_va + i) != i) {
 			M4UMSG("wawawa, get map value fail! i=%d, map=%d\n", i,
 			       *(int *)(kernel_va + i));
+		}
 	}
 
 	ret = m4u_mva_unmap_kernel(mva, size, kernel_va);
@@ -199,45 +199,43 @@ static int m4u_test_map_kernel(void)
 }
 
 int m4u_test_ddp(unsigned int prot)
-{				/*
-				   unsigned int *pSrc, *pDst;
-				   unsigned int src_pa, dst_pa;
-				   unsigned int size = 64 * 64 * 3;
-				   M4U_PORT_STRUCT port;
-				   m4u_client_t *client = m4u_create_client();
+{
+	unsigned int *pSrc, *pDst;
+	unsigned int src_pa, dst_pa;
+	unsigned int size = 64 * 64 * 3;
+	M4U_PORT_STRUCT port;
+	m4u_client_t *client = m4u_create_client();
 
-				   pSrc = vmalloc(size);
-				   pDst = vmalloc(size);
+	pSrc = vmalloc(size);
+	pDst = vmalloc(size);
 
-				   m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pSrc, NULL,
-				   size, prot, 0, &src_pa);
+	m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pSrc, NULL,
+		      size, prot, 0, &src_pa);
 
-				   m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pDst, NULL,
-				   size, prot, 0, &dst_pa);
+	m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pDst, NULL,
+		      size, prot, 0, &dst_pa);
 
-				   M4UINFO("pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n",
-					   pSrc, pDst, src_pa, dst_pa);
+	M4UINFO("pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n", pSrc, pDst, src_pa, dst_pa);
 
-				   port.ePortID = M4U_PORT_DISP_OVL0;
-				   port.Direction = 0;
-				   port.Distance = 1;
-				   port.domain = 3;
-				   port.Security = 0;
-				   port.Virtuality = 1;
-				   m4u_config_port(&port);
+	port.ePortID = M4U_PORT_DISP_OVL0;
+	port.Direction = 0;
+	port.Distance = 1;
+	port.domain = 3;
+	port.Security = 0;
+	port.Virtuality = 1;
+	m4u_config_port(&port);
 
-				   port.ePortID = M4U_PORT_DISP_WDMA0;
-				   m4u_config_port(&port);
+	port.ePortID = M4U_PORT_DISP_WDMA0;
+	m4u_config_port(&port);
 
-				   m4u_monitor_start(0);
-				   __ddp_mem_test(pSrc, src_pa, pDst, dst_pa, !(prot & M4U_PROT_CACHE));
-				   m4u_monitor_stop(0);
+	m4u_monitor_start(0);
+	__ddp_mem_test(pSrc, src_pa, pDst, dst_pa, !(prot & M4U_PROT_CACHE));
+	m4u_monitor_stop(0);
 
-				   vfree(pSrc);
-				   vfree(pDst);
+	vfree(pSrc);
+	vfree(pDst);
 
-				   m4u_destroy_client(client);
-				 */
+	m4u_destroy_client(client);
 	return 0;
 }
 
@@ -257,99 +255,28 @@ m4u_callback_ret_t test_fault_callback(int port, unsigned int mva, void *data)
 
 
 int m4u_test_tf(unsigned int prot)
-{				/*
-				   unsigned int *pSrc, *pDst;
-				   unsigned int src_pa, dst_pa;
-				   unsigned int size = 64 * 64 * 3;
-				   M4U_PORT_STRUCT port;
-				   m4u_client_t *client = m4u_create_client();
-				   int data = 88;
-
-
-				   m4u_register_fault_callback(M4U_PORT_DISP_OVL0, test_fault_callback, &data);
-				   m4u_register_fault_callback(M4U_PORT_DISP_WDMA0, test_fault_callback, &data);
-
-				   pSrc = vmalloc(size);
-				   pDst = vmalloc(size);
-
-				   m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pSrc, NULL,
-				   size, prot, 0, &src_pa);
-
-				   m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pDst, NULL,
-				   size / 2, prot, 0, &dst_pa);
-
-				   M4UINFO("pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n",
-					   pSrc, pDst, src_pa, dst_pa);
-
-				   port.ePortID = M4U_PORT_DISP_OVL0;
-				   port.Direction = 0;
-				   port.Distance = 1;
-				   port.domain = 3;
-				   port.Security = 0;
-				   port.Virtuality = 1;
-				   m4u_config_port(&port);
-
-				   port.ePortID = M4U_PORT_DISP_WDMA0;
-				   m4u_config_port(&port);
-
-				   m4u_monitor_start(0);
-				   __ddp_mem_test(pSrc, src_pa, pDst, dst_pa, !!(prot & M4U_PROT_CACHE));
-				   m4u_monitor_stop(0);
-
-
-				   m4u_dealloc_mva(client, M4U_PORT_DISP_OVL0, src_pa);
-				   m4u_dealloc_mva(client, M4U_PORT_DISP_OVL0, dst_pa);
-
-				   vfree(pSrc);
-				   vfree(pDst);
-
-				   m4u_destroy_client(client);
-				 */
-	return 0;
-}
-
-#if 0
-#include <linux/ion_drv.h>
-
-void m4u_test_ion(void)
 {
 	unsigned int *pSrc, *pDst;
-	unsigned long src_pa, dst_pa;
-	unsigned int size = 64 * 64 * 3, tmp_size;
+	unsigned int src_pa, dst_pa;
+	unsigned int size = 64 * 64 * 3;
 	M4U_PORT_STRUCT port;
-	struct ion_mm_data mm_data;
-	struct ion_client *ion_client;
-	struct ion_handle *src_handle, *dst_handle;
-
-	/* FIX-ME: modified for linux-3.10 early porting */
-	/* ion_client = ion_client_create(g_ion_device, 0xffffffff, "test"); */
-	ion_client = ion_client_create(g_ion_device, "test");
-
-	src_handle = ion_alloc(ion_client, size, 0, ION_HEAP_MULTIMEDIA_MASK, 0);
-	dst_handle = ion_alloc(ion_client, size, 0, ION_HEAP_MULTIMEDIA_MASK, 0);
-
-	pSrc = ion_map_kernel(ion_client, src_handle);
-	pDst = ion_map_kernel(ion_client, dst_handle);
-
-	mm_data.config_buffer_param.kernel_handle = src_handle;
-	mm_data.config_buffer_param.eModuleID = M4U_PORT_DISP_OVL0;
-	mm_data.config_buffer_param.security = 0;
-	mm_data.config_buffer_param.coherent = 0;
-	mm_data.mm_cmd = ION_MM_CONFIG_BUFFER;
-	if (ion_kernel_ioctl(ion_client, ION_CMD_MULTIMEDIA, (unsigned long)&mm_data) < 0)
-		M4UMSG("ion_test_drv: Config buffer failed.\n");
-
-	mm_data.config_buffer_param.kernel_handle = dst_handle;
-	if (ion_kernel_ioctl(ion_client, ION_CMD_MULTIMEDIA, (unsigned long)&mm_data) < 0)
-		M4UMSG("ion_test_drv: Config buffer failed.\n");
+	m4u_client_t *client = m4u_create_client();
+	int data = 88;
 
 
-	ion_phys(ion_client, src_handle, &src_pa, &tmp_size);
-	ion_phys(ion_client, dst_handle, &dst_pa, &tmp_size);
+	m4u_register_fault_callback(M4U_PORT_DISP_OVL0, test_fault_callback, &data);
+	m4u_register_fault_callback(M4U_PORT_DISP_WDMA0, test_fault_callback, &data);
 
+	pSrc = vmalloc(size);
+	pDst = vmalloc(size);
 
-	M4UMSG("ion alloced: pSrc=0x%x, pDst=0x%x, src_pa=0x%x, dst_pa=0x%x\n", pSrc, pDst, src_pa,
-	       dst_pa);
+	m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pSrc, NULL,
+		      size, prot, 0, &src_pa);
+
+	m4u_alloc_mva(client, M4U_PORT_DISP_OVL0, (unsigned long)pDst, NULL,
+		      size / 2, prot, 0, &dst_pa);
+
+	M4UINFO("pSrc=0x%p, pDst=0x%p, src_pa=0x%x, dst_pa=0x%x\n", pSrc, pDst, src_pa, dst_pa);
 
 	port.ePortID = M4U_PORT_DISP_OVL0;
 	port.Direction = 0;
@@ -363,25 +290,28 @@ void m4u_test_ion(void)
 	m4u_config_port(&port);
 
 	m4u_monitor_start(0);
-	/* __ddp_mem_test(pSrc, (void*)src_pa, pDst, (void*)dst_pa, 0); */
+	__ddp_mem_test(pSrc, src_pa, pDst, dst_pa, !!(prot & M4U_PROT_CACHE));
 	m4u_monitor_stop(0);
 
 
-	ion_free(ion_client, src_handle);
-	ion_free(ion_client, dst_handle);
+	m4u_dealloc_mva(client, M4U_PORT_DISP_OVL0, src_pa);
+	m4u_dealloc_mva(client, M4U_PORT_DISP_OVL0, dst_pa);
 
-	ion_client_destroy(ion_client);
+	vfree(pSrc);
+	vfree(pDst);
 
+	m4u_destroy_client(client);
+
+	return 0;
 }
-#else
+
 #define m4u_test_ion(...)
-#endif
 
 static int m4u_debug_set(void *data, u64 val)
 {
 	m4u_domain_t *domain = data;
 
-	M4UINFO("m4u_debug_set:val=%llu\n", val);
+	M4UMSG("m4u_debug_set:val=%llu\n", val);
 
 	switch (val) {
 	case 1:
@@ -559,7 +489,7 @@ static int m4u_debug_set(void *data, u64 val)
 		break;
 
 	case 12:
-		/* ddp_mem_test(); */
+		ddp_mem_test();
 		break;
 
 	case 13:
@@ -647,7 +577,6 @@ static int m4u_debug_set(void *data, u64 val)
 			unsigned int *pSrc;
 			unsigned int mva;
 			unsigned long pa;
-
 			m4u_client_t *client = m4u_create_client();
 
 			pSrc = vmalloc(128);
@@ -657,12 +586,13 @@ static int m4u_debug_set(void *data, u64 val)
 			m4u_dump_pgtable(domain, NULL);
 
 			pa = m4u_mva_to_pa(NULL, 0, mva);
-			M4UMSG("(1) mva:0x%x pa:0x%lx\n", mva, pa);
 			m4u_dealloc_mva(client, M4U_PORT_DISP_OVL0, mva);
-			pa = m4u_mva_to_pa(NULL, 0, mva);
-			M4UMSG("(2) mva:0x%x pa:0x%lx\n", mva, pa);
+			M4UMSG("mva:0x%x pa:0x%lx\n", mva, pa);
 			m4u_destroy_client(client);
 		}
+		break;
+	case 30:
+		m4u_dump_buf_info(NULL);
 		break;
 
 	default:
@@ -700,29 +630,6 @@ static int m4u_log_level_get(void *data, u64 *val)
 
 DEFINE_SIMPLE_ATTRIBUTE(m4u_log_level_fops, m4u_log_level_get, m4u_log_level_set, "%llu\n");
 
-static int m4u_debug_freemva_set(void *data, u64 val)
-{
-	m4u_domain_t *domain = data;
-	m4u_buf_info_t *pMvaInfo;
-	unsigned int mva = (unsigned int)val;
-
-	M4UMSG("free mva: 0x%x\n", mva);
-	pMvaInfo = mva_get_priv(mva);
-	if (pMvaInfo) {
-		m4u_unmap(domain, mva, pMvaInfo->size);
-		m4u_do_mva_free(mva, pMvaInfo->size);
-	}
-	return 0;
-}
-
-static int m4u_debug_freemva_get(void *data, u64 *val)
-{
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_freemva_fops, m4u_debug_freemva_get, m4u_debug_freemva_set,
-			"%llu\n");
-
 
 int m4u_debug_port_show(struct seq_file *s, void *unused)
 {
@@ -737,25 +644,6 @@ int m4u_debug_port_open(struct inode *inode, struct file *file)
 
 const struct file_operations m4u_debug_port_fops = {
 	.open = m4u_debug_port_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = seq_release,
-};
-
-
-int m4u_debug_mva_show(struct seq_file *s, void *unused)
-{
-	m4u_mvaGraph_dump();
-	return 0;
-}
-
-int m4u_debug_mva_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, m4u_debug_mva_show, inode->i_private);
-}
-
-const struct file_operations m4u_debug_mva_fops = {
-	.open = m4u_debug_mva_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = seq_release,
@@ -782,7 +670,7 @@ const struct file_operations m4u_debug_buf_fops = {
 
 int m4u_debug_monitor_show(struct seq_file *s, void *unused)
 {
-	m4u_print_perf_counter(0, "monitor");
+	m4u_print_perf_counter(0, 0, "monitor");
 	return 0;
 }
 
@@ -800,7 +688,7 @@ const struct file_operations m4u_debug_monitor_fops = {
 
 int m4u_debug_register_show(struct seq_file *s, void *unused)
 {
-	m4u_dump_reg(0, 0);
+	m4u_dump_reg(0);
 	return 0;
 }
 
@@ -860,17 +748,6 @@ int m4u_debug_init(struct m4u_device *m4u_dev)
 				&m4u_debug_register_fops);
 	if (IS_ERR_OR_NULL(debug_file))
 		M4UMSG("m4u: failed to create debug files 6.\n");
-
-	debug_file =
-	    debugfs_create_file("freemva", 0644, m4u_dev->debug_root, domain,
-				&m4u_debug_freemva_fops);
-	if (IS_ERR_OR_NULL(debug_file))
-		M4UMSG("m4u: failed to create debug files 7.\n");
-
-	debug_file =
-	    debugfs_create_file("mva", 0644, m4u_dev->debug_root, domain, &m4u_debug_mva_fops);
-	if (IS_ERR_OR_NULL(debug_file))
-		M4UMSG("m4u: failed to create debug files 8.\n");
 
 
 	return 0;

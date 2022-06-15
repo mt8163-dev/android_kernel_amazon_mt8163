@@ -11,8 +11,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _MT8163_M4U_REG_H__
-#define _MT8163_M4U_REG_H__
+#ifndef _MT8167_M4U_REG_H__
+#define _MT8167_M4U_REG_H__
 
 #ifdef CONFIG_MTK_GPU_SAPPHIRE_LITE
 #define M4U_INHOUSE_GPU_EN  1
@@ -22,11 +22,12 @@
 #endif
 
 #if M4U_INHOUSE_GPU_EN
-#define TOTAL_M4U_NUM     3
-#else
 #define TOTAL_M4U_NUM     2
+#else
+#define TOTAL_M4U_NUM     1
 #endif
 
+/*
 #define M4U_BASE0                0xf0205000
 #define M4U_BASE1                0xf0214000
 
@@ -35,10 +36,10 @@
 #define LARB2_BASE	0xf4017000
 #define LARB3_BASE	0xf4018000
 #define LARB4_BASE	0xf5001000
-
+*/
 /* smi_common register is in mmsys domain */
 /* needs to call smi_common_clock_on/off when access these registers */
-#define SMI_COMMON_EXT_BASE 0xf4022000
+/* #define SMI_COMMON_EXT_BASE 0xf4022000 */
 
 /* ================================================= */
 /* common macro definitions */
@@ -116,21 +117,18 @@
 
 #define REG_MMU_LEGACY_4KB_MODE     (0x60)
 
-#define REG_MMU_PFH_DIST0           0x80
-#define REG_MMU_PFH_DIST1           0x84
-#define REG_MMU_PFH_DIST2           0x88
-#define REG_MMU_PFH_DIST3           0x8c
-#define REG_MMU_PFH_DIST4           0x90
-#define REG_MMU_PFH_DIST5           0x94
-#define REG_MMU_PFH_DIST6           0x98
-#define REG_MMU_PFH_DIST7           0x9c
+#define REG_MMU_PFH_DIST0           0xb00
+#define REG_MMU_PFH_DIST1           0xb04
+#define REG_MMU_PFH_DIST2           0xb08
+#define REG_MMU_PFH_DIST3           0xb0c
 
-#define REG_MMU_PFH_DIST(port)      (0x80+(((port)>>3)<<2))
+
+#define REG_MMU_PFH_DIST(port)      (0xb00+(((port)>>3)<<2))
 #define F_MMU_PFH_DIST_VAL(port, val) ((val&0xf)<<(((port)&0x7)<<2))
 #define F_MMU_PFH_DIST_MASK(port)     F_MMU_PFH_DIST_VAL((port), 0xf)
 
-#define REG_MMU_PFH_DIR0         0xF0
-#define REG_MMU_PFH_DIR1         0xF4
+#define REG_MMU_PFH_DIR0         0xD00
+#define REG_MMU_PFH_DIR1         0xD00
 #define REG_MMU_PFH_DIR(port)   (((port) < 32) ? REG_MMU_PFH_DIR0 : REG_MMU_PFH_DIR1)
 #define F_MMU_PFH_DIR(port, val) ((!!(val))<<((port)&0x1f))
 
@@ -138,13 +136,14 @@
 #define REG_MMU_READ_ENTRY       0x100
 #define F_READ_ENTRY_EN                 F_BIT_SET(31)
 #define F_READ_ENTRY_MM0_MAIN           F_BIT_SET(25)
-#define F_READ_ENTRY_MMx_MAIN(id)       F_BIT_SET(25+id)
-#define F_READ_ENTRY_PFH                F_BIT_SET(24)
-#define F_READ_ENTRY_MAIN_IDX(idx)      F_VAL(idx, 21, 16)
-#define F_READ_ENTRY_PFH_IDX(idx)       F_VAL(idx, 10, 5)
+#define F_READ_ENTRY_MMx_MAIN(id)	     F_BIT_SET(27)
+#define F_READ_ENTRY_PFH		     F_BIT_SET(26)
+#define F_READ_ENTRY_MAIN_IDX(idx)      F_VAL(idx, 16, 12)
+#define F_READ_ENTRY_PFH_IDX(idx)	     F_VAL(idx, 9, 5)
+
     /* #define F_READ_ENTRY_PFH_HI_LO(high)    F_VAL(high, 4,4) */
     /* #define F_READ_ENTRY_PFH_PAGE(page)     F_VAL(page, 3,2) */
-#define F_READ_ENTRY_PFH_PAGE_IDX(idx)    F_VAL(idx, 4, 2)
+#define F_READ_ENTRY_PFH_PAGE_IDX(idx)    F_VAL(idx, 3, 2)
 #define F_READ_ENTRY_PFH_WAY(way)       F_VAL(way, 1, 0)
 
 #define REG_MMU_DES_RDATA        0x104
@@ -161,31 +160,26 @@
 
 
 /* tag related macro */
-#define MMU0_SET_ORDER         6
-#define MMU1_SET_ORDER         5
+#define MMU0_SET_ORDER         3
+#define MMU1_SET_ORDER         3
 #define MMU_SET_ORDER(mmu)      ((mmu == 0) ? MMU0_SET_ORDER : MMU1_SET_ORDER)
 #define MMU_SET_NR(mmu)    (1<<MMU_SET_ORDER(mmu))
 #define MMU_SET_LSB_OFFSET               15
 #define MMU_SET_MSB_OFFSET(mmu)         (MMU_SET_LSB_OFFSET+MMU_SET_ORDER(mmu)-1)
 #define MMU_PFH_VA_TO_SET(mmu, va)     F_MSK_SHIFT(va, MMU_SET_MSB_OFFSET(mmu), MMU_SET_LSB_OFFSET)
 
-#define MMU_PAGE_PER_LINE      8
+#define MMU_PAGE_PER_LINE      4
 #define MMU_WAY_NR  4
 #define MMU_PFH_TOTAL_LINE(mmu) (MMU_SET_NR(mmu)*MMU_WAY_NR)
 
 
 #define REG_MMU_CTRL_REG         0x110
 #define F_MMU_CTRL_PFH_DIS(dis)         F_BIT_VAL(dis, 0)
-#define F_MMU_CTRL_TLB_WALK_DIS(dis)    F_BIT_VAL(dis, 1)
-#define F_MMU_CTRL_MONITOR_EN(en)       F_BIT_VAL(en, 2)
-#define F_MMU_CTRL_MONITOR_CLR(clr)       F_BIT_VAL(clr, 3)
-#define F_MMU_CTRL_REROUTE_PFQ_TO_MQ(en)           F_BIT_VAL(en, 4)
-#define F_MMU_CTRL_TF_PROT_VAL(prot)    F_VAL(prot, 6, 5)
-#define F_MMU_CTRL_TF_PROT_MSK           F_MSK(6, 5)
-#define F_MMU_CTRL_INT_HANG_en(en)       F_BIT_VAL(en, 7)
-#define F_MMU_CTRL_COHERE_EN(en)        F_BIT_VAL(en, 8)
-#define F_MMU_CTRL_IN_ORDER_WR(en)      F_BIT_VAL(en, 9)
-#define F_MMU_CTRL_MAIN_TLB_SHARE_ALL(en)   F_BIT_VAL(en, 10)
+#define F_MMU_CTRL_MONITOR_EN(en)       F_BIT_VAL(en, 1)
+#define F_MMU_CTRL_MONITOR_CLR(clr)       F_BIT_VAL(clr, 2)
+#define F_MMU_CTRL_TF_PROT_VAL(prot)    F_VAL(prot, 5, 4)
+#define F_MMU_CTRL_TF_PROT_MSK           F_MSK(5, 4)
+#define F_MMU_CTRL_INT_HANG_en(en)       F_BIT_VAL(en, 6)
 
 
 #define REG_MMU_IVRP_PADDR       0x114
@@ -316,14 +310,20 @@
 /* SMI larb */
 /* ================================================================ */
 
-#define SMI_LARB_MMU_EN                 (0xf00)
-#define F_SMI_MMU_EN(port, en)       ((en)<<((port)))
-#define SMI_LARB_SEC_EN                (0xf04)
-#define F_SMI_SEC_EN(port, en)       ((en)<<((port)))
-#define SMI_LARB_DOMN_L                 (0xf08)
-#define SMI_LARB_DOMN_H                 (0xf0c)
-#define REG_SMI_LARB_DOMN_OF_PORT(port)     (((port) > 15) ? 0xf0c : 0xf08)
-#define F_SMI_DOMN(port, domain)        (((domain)&0x3)<<((((port) > 15) ? (port-16) : port)<<1))
+#define SMI_LARB_MMU_EN		(0xfc0)
+#define F_SMI_MMU_EN(port, en)	((en)<<((port)))
+#define SMI_LARB_SEC_EN		(0xfc4)
+#define F_SMI_SEC_EN(port, en)	((en)<<((port)))
+#define SMI_LARB_DOMN_0		0xfd0
+#define SMI_LARB_DOMN_1		0xfd4
+#define SMI_LARB_DOMN_2		0xfd8
+#define SMI_LARB_DOMN_3		0xfdc
+#define DOMN12(port)		((port) > 7 ? SMI_LARB_DOMN_1 : SMI_LARB_DOMN_0)
+#define DOMN23(port)		((port) > 23 ? SMI_LARB_DOMN_3 : SMI_LARB_DOMN_2)
+#define REG_SMI_LARB_DOMN_OF_PORT(port)	((port) > 15 ? DOMN23(port) : DOMN12(port))
+
+/* each domain occupy 4 bit, for port0 in domain[3:0] */
+#define F_SMI_DOMN(port, domain)        ((((domain)&0x4) << (((port) % 4) << 2)))
 
 /* ========================================================================= */
 /* peripheral system */
@@ -359,6 +359,7 @@ static inline void M4U_WriteReg32(unsigned long M4uBase, unsigned int Offset, un
 #if M4U_INHOUSE_GPU_EN
 	extern m4u_regwrite_callback_t *gRegWrite;
 	extern unsigned long gM4UBaseAddr[TOTAL_M4U_NUM];
+
 	if (gRegWrite && M4uBase == gM4UBaseAddr[2])	/*only for gpu test */
 		gRegWrite((M4uBase + Offset), Val);
 #endif

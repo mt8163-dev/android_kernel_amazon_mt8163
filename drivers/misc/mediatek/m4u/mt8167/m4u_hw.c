@@ -26,7 +26,7 @@ static m4u_domain_t gM4uDomain;
 
 unsigned long gM4UBaseAddr[TOTAL_M4U_NUM];
 static unsigned long gPericfgBaseAddr;
-static unsigned int gM4UTagCount[] = { 64, 32, 32 };
+static unsigned int gM4UTagCount[] = { 32, 32, 32 };
 
 
 static M4U_RANGE_DES_T gM4u0_seq[M4U0_SEQ_NR] = { {0} };
@@ -61,49 +61,35 @@ m4u_port_t gM4uPort[] = {
 	M4U0_PORT_INIT("DISP_OVL0", 0, 0, 0),
 	M4U0_PORT_INIT("DISP_RDMA0", 0, 0, 1),
 	M4U0_PORT_INIT("DISP_WDMA0", 0, 0, 2),
-	M4U0_PORT_INIT("DISP_OVL1", 0, 0, 3),
-	M4U0_PORT_INIT("DISP_RDMA1", 0, 0, 4),
-	M4U0_PORT_INIT("DISP_WDMA1", 0, 0, 5),
-	M4U0_PORT_INIT("UFOD_RDMA0", 0, 0, 6),
-	M4U0_PORT_INIT("UFOD_RDMA1", 0, 0, 7),
-	M4U0_PORT_INIT("UFOD_RDMA2", 0, 0, 8),
-	M4U0_PORT_INIT("UFOD_RDMA3", 0, 0, 9),
-	M4U0_PORT_INIT("UFOD_RDMA4", 0, 0, 10),
-	M4U0_PORT_INIT("UFOD_RDMA5", 0, 0, 11),
-	M4U0_PORT_INIT("UFOD_RDMA6", 0, 0, 12),
-	M4U0_PORT_INIT("UFOD_RDMA7", 0, 0, 13),
-	M4U0_PORT_INIT("MDP_RDMA", 0, 0, 14),
-	M4U0_PORT_INIT("MDP_WDMA", 0, 0, 15),
-	M4U0_PORT_INIT("MDP_WROT", 0, 0, 16),
+	M4U0_PORT_INIT("DISP_RDMA1", 0, 0, 3),
+	M4U0_PORT_INIT("MDP_RDMA", 0, 0, 4),
+	M4U0_PORT_INIT("MDP_WDMA", 0, 0, 5),
+	M4U0_PORT_INIT("MDP_WROT", 0, 0, 6),
+	M4U0_PORT_INIT("DISP_FAKE", 0, 0, 7),
 
-	M4U0_PORT_INIT("VDEC_MC", 0, 1, 0),
-	M4U0_PORT_INIT("VDEC_PP", 0, 1, 1),
-	M4U0_PORT_INIT("VDEC_VLD", 0, 1, 2),
-	M4U0_PORT_INIT("VDEC_AVC_MV", 0, 1, 3),
-	M4U0_PORT_INIT("VDEC_PRED_RD", 0, 1, 4),
-	M4U0_PORT_INIT("VDEC_PRED_WR", 0, 1, 5),
-	M4U0_PORT_INIT("VDEC_PPWRAP", 0, 1, 6),
+	M4U0_PORT_INIT("CAM_IMGO", 0, 1, 0),
+	M4U0_PORT_INIT("CAM_IMG2O", 0, 1, 1),
+	M4U0_PORT_INIT("CAM_LSCI", 0, 1, 2),
+	M4U0_PORT_INIT("CAM_ESFKO", 0, 1, 3),
+	M4U0_PORT_INIT("CAM_AA0", 0, 1, 4),
+	M4U0_PORT_INIT("VENC_REC", 0, 1, 5),
+	M4U0_PORT_INIT("VENC_BSDMA", 0, 1, 6),
+	M4U0_PORT_INIT("VENC_RD_COMV", 0, 1, 7),
+	M4U0_PORT_INIT("CAM_IMGI", 0, 1, 8),
+	M4U0_PORT_INIT("VENC_CUR_LUMA", 0, 1, 9),
+	M4U0_PORT_INIT("VENC_CUR_CHROMA", 0, 1, 10),
+	M4U0_PORT_INIT("VENC_REF_LUMA", 0, 1, 11),
+	M4U0_PORT_INIT("VENC_REF_CHROMA", 0, 1, 12),
 
-	M4U0_PORT_INIT("CAM_IMGO", 0, 2, 0),
-	M4U0_PORT_INIT("CAM_IMG2O", 0, 2, 1),
-	M4U0_PORT_INIT("CAM_LSCI", 0, 2, 2),
-	M4U0_PORT_INIT("CAM_IMGI", 0, 2, 3),
-	M4U0_PORT_INIT("CAM_ESFKO", 0, 2, 4),
-	M4U0_PORT_INIT("CAM_AAO", 0, 2, 5),
 
-	M4U0_PORT_INIT("VENC_RCPU", 0, 3, 0),
-	M4U0_PORT_INIT("VENC_REC", 0, 3, 1),
-	M4U0_PORT_INIT("VENC_BSDMA", 0, 3, 2),
-	M4U0_PORT_INIT("VENC_SV_COMV", 0, 3, 3),
-	M4U0_PORT_INIT("VENC_RD_COMV", 0, 3, 4),
-	M4U0_PORT_INIT("JPGENC_RDMA", 0, 3, 5),
-	M4U0_PORT_INIT("JPGENC_BSDMA", 0, 3, 6),
-	M4U0_PORT_INIT("JPGDEC_WDMA", 0, 3, 7),
-	M4U0_PORT_INIT("JPGDEC_BSDMA", 0, 3, 8),
-	M4U0_PORT_INIT("VENC_CUR_LUMA", 0, 3, 9),
-	M4U0_PORT_INIT("VENC_CUR_CHROMA", 0, 3, 10),
-	M4U0_PORT_INIT("VENC_REF_LUMA", 0, 3, 11),
-	M4U0_PORT_INIT("VENC_REF_CHROMA", 0, 3, 12),
+	M4U0_PORT_INIT("HW_VDEC_MC_EXT", 0, 2, 0),
+	M4U0_PORT_INIT("HW_VDEC_PP_EXT", 0, 2, 1),
+	M4U0_PORT_INIT("HW_VDEC_VLD_EXT", 0, 2, 2),
+	M4U0_PORT_INIT("HW_VDEC_AVC_MV_EXT", 0, 2, 3),
+	M4U0_PORT_INIT("HW_VDEC_PRED_RD_EXT", 0, 2, 4),
+	M4U0_PORT_INIT("HW_VDEC_PRED_WR_EXT", 0, 2, 5),
+	M4U0_PORT_INIT("HW_VDEC_PPWRAP_EXT", 0, 2, 6),
+	M4U0_PORT_INIT("UNKNOWN", 0, 2, 7),
 
 	M4U1_PORT_INIT("DBG_I2C", 0, 0x8),
 	M4U1_PORT_INIT("SPM", 1, 0x28),
@@ -226,7 +212,6 @@ void m4u_invalid_tlb_by_range(m4u_domain_t *m4u_domain, unsigned int mva_start,
 	/* m4u_invalid_tlb_all(0); */
 	/* m4u_invalid_tlb_all(1); */
 }
-
 
 void m4u_invalid_tlb_sec(int m4u_id, int L2_en, int isInvAll, unsigned int mva_start,
 			 unsigned int mva_end)
@@ -1286,13 +1271,8 @@ static int _m4u_config_port(int port, int virt, int sec, int dis, int dir)
 			goto unlock_out;
 		}
 
-		if (!gPericfgBaseAddr) {
-			M4UMSG("warning gPericfgBaseAddr is %lu\n", gPericfgBaseAddr);
-			ret = -1;
-			goto unlock_out;
-		}
-
 		larb_port = m4u_port_2_larb_port(port);
+
 		m4uHw_set_field_by_mask(gPericfgBaseAddr, REG_PERIAXI_BUS_CTL3,
 					F_PERI_MMU_EN(larb_port, 1),
 					F_PERI_MMU_EN(larb_port, !!(virt)));
@@ -1537,10 +1517,6 @@ int m4u_reg_backup(int m4u_id)
 		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST1, *(pReg++));
 		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST2, *(pReg++));
 		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST3, *(pReg++));
-		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST4, *(pReg++));
-		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST5, *(pReg++));
-		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST6, *(pReg++));
-		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIST7, *(pReg++));
 		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIR0, *(pReg++));
 		__M4U_BACKUP(m4u_base, REG_MMU_PFH_DIR1, *(pReg++));
 		__M4U_BACKUP(m4u_base, REG_MMU_CTRL_REG, *(pReg++));
@@ -1613,10 +1589,6 @@ int m4u_reg_restore(int m4u_id)
 		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST1, *(pReg++));
 		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST2, *(pReg++));
 		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST3, *(pReg++));
-		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST4, *(pReg++));
-		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST5, *(pReg++));
-		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST6, *(pReg++));
-		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIST7, *(pReg++));
 		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIR0, *(pReg++));
 		__M4U_RESTORE(m4u_base, REG_MMU_PFH_DIR1, *(pReg++));
 		__M4U_RESTORE(m4u_base, REG_MMU_CTRL_REG, *(pReg++));
@@ -1675,7 +1647,7 @@ EXPORT_SYMBOL(m4u_get_gpu_translationfault_state);
 
 #ifndef M4U_TEE_SERVICE_ENABLE
 
-static unsigned int larb_reg_backup_buf[SMI_LARB_NR][4];
+static unsigned int larb_reg_backup_buf[SMI_LARB_NR][6];
 static int larb_backup(unsigned int larb_idx)
 {
 	unsigned long larb_base;
@@ -1689,8 +1661,10 @@ static int larb_backup(unsigned int larb_idx)
 
 	__M4U_BACKUP(larb_base, SMI_LARB_MMU_EN, larb_reg_backup_buf[larb_idx][0]);
 	__M4U_BACKUP(larb_base, SMI_LARB_SEC_EN, larb_reg_backup_buf[larb_idx][1]);
-	__M4U_BACKUP(larb_base, SMI_LARB_DOMN_L, larb_reg_backup_buf[larb_idx][2]);
-	__M4U_BACKUP(larb_base, SMI_LARB_DOMN_H, larb_reg_backup_buf[larb_idx][3]);
+	__M4U_BACKUP(larb_base, SMI_LARB_DOMN_0, larb_reg_backup_buf[larb_idx][2]);
+	__M4U_BACKUP(larb_base, SMI_LARB_DOMN_1, larb_reg_backup_buf[larb_idx][3]);
+	__M4U_BACKUP(larb_base, SMI_LARB_DOMN_2, larb_reg_backup_buf[larb_idx][4]);
+	__M4U_BACKUP(larb_base, SMI_LARB_DOMN_3, larb_reg_backup_buf[larb_idx][5]);
 
 	M4UINFO("larb(%d) backup: 0x%x\n", larb_idx, larb_reg_backup_buf[larb_idx][0]);
 	return 0;
@@ -1709,8 +1683,11 @@ static int larb_restore(unsigned int larb_idx)
 
 	__M4U_RESTORE(larb_base, SMI_LARB_MMU_EN, larb_reg_backup_buf[larb_idx][0]);
 	__M4U_RESTORE(larb_base, SMI_LARB_SEC_EN, larb_reg_backup_buf[larb_idx][1]);
-	__M4U_RESTORE(larb_base, SMI_LARB_DOMN_L, larb_reg_backup_buf[larb_idx][2]);
-	__M4U_RESTORE(larb_base, SMI_LARB_DOMN_H, larb_reg_backup_buf[larb_idx][3]);
+	__M4U_RESTORE(larb_base, SMI_LARB_DOMN_0, larb_reg_backup_buf[larb_idx][2]);
+	__M4U_RESTORE(larb_base, SMI_LARB_DOMN_1, larb_reg_backup_buf[larb_idx][3]);
+	__M4U_RESTORE(larb_base, SMI_LARB_DOMN_2, larb_reg_backup_buf[larb_idx][4]);
+	__M4U_RESTORE(larb_base, SMI_LARB_DOMN_3, larb_reg_backup_buf[larb_idx][5]);
+
 
 	M4UINFO("larb(%d) restore: 0x%x (0x%x)\n", larb_idx,
 		M4U_ReadReg32(larb_base, SMI_LARB_MMU_EN), larb_reg_backup_buf[larb_idx][0]);
@@ -1948,10 +1925,6 @@ int m4u_unregister_fault_callback(int port)
 
 int m4u_enable_tf(int port, bool fgenable)
 {
-	if (port > M4U_PORT_UNKNOWN || port < 0) {
-		M4UMSG("%s fail, port=%d\n", __func__, port);
-		return -1;
-	}
 	gM4uPort[port].enable_tf = fgenable;
 	return 0;
 }
@@ -2182,6 +2155,7 @@ irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
 		}
 
 		m4u_clear_intr(m4u_index);
+		m4u_invalid_tlb_all(m4u_index);
 		m4u_isr_record();
 	}
 
@@ -2268,22 +2242,16 @@ int m4u_reg_init(m4u_domain_t *m4u_domain, unsigned long ProtectPA, int m4u_id)
 
 		if (0 == m4u_id) {	/* mm_iommu */
 			regval = regval | F_MMU_CTRL_PFH_DIS(0)
-			    | F_MMU_CTRL_TLB_WALK_DIS(0)
 			    | F_MMU_CTRL_MONITOR_EN(0)
 			    | F_MMU_CTRL_MONITOR_CLR(0)
-			    | F_MMU_CTRL_REROUTE_PFQ_TO_MQ(1)
 			    | F_MMU_CTRL_TF_PROT_VAL(2)
-			    | F_MMU_CTRL_INT_HANG_en(0)
-			    | F_MMU_CTRL_COHERE_EN(1);
+			    | F_MMU_CTRL_INT_HANG_en(0);
 		} else {	/* peri_iommu */
 			regval = regval | F_MMU_CTRL_PFH_DIS(1)
-			    | F_MMU_CTRL_TLB_WALK_DIS(0)
 			    | F_MMU_CTRL_MONITOR_EN(0)
 			    | F_MMU_CTRL_MONITOR_CLR(0)
-			    | F_MMU_CTRL_REROUTE_PFQ_TO_MQ(0)
 			    | F_MMU_CTRL_TF_PROT_VAL(2)
-			    | F_MMU_CTRL_INT_HANG_en(0)
-			    | F_MMU_CTRL_COHERE_EN(1);
+			    | F_MMU_CTRL_INT_HANG_en(0);
 		}
 
 		M4U_WriteReg32(gM4UBaseAddr[m4u_id], REG_MMU_CTRL_REG, regval);
@@ -2308,13 +2276,12 @@ int m4u_reg_init(m4u_domain_t *m4u_domain, unsigned long ProtectPA, int m4u_id)
 	/* special settings for mmu0 (multimedia iommu) */
 	if (0 == m4u_id) {
 		unsigned long m4u_base = gM4UBaseAddr[0];
-		/* 2 disable in-order-write */
-		m4uHw_set_field_by_mask(m4u_base, REG_MMU_CTRL_REG,
-					F_MMU_CTRL_IN_ORDER_WR(1), F_MMU_CTRL_IN_ORDER_WR(0));
+
 		/* 3 non-standard AXI mode */
 		M4U_WriteReg32(m4u_base, REG_MMU_STANDARD_AXI_MODE, 0);
 		/* 4 write command throttling mode */
-		m4uHw_set_field_by_mask(m4u_base, REG_MMU_WR_LEN, F_BIT_SET(5), 0);
+		M4U_WriteReg32(m4u_base, REG_MMU_WR_LEN, 0x3f);
+		/* m4uHw_set_field_by_mask(m4u_base, REG_MMU_WR_LEN, F_BIT_SET(5), 0);*/
 	}
 
 	return 0;

@@ -25,15 +25,16 @@
 #include "m4u_reg.h"
 #include "m4u_pgtable.h"
 
-#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
-/*&& defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)*/
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
 #define M4U_TEE_SERVICE_ENABLE
 
 #include "tz_cross/trustzone.h"
 #include "trustzone/kree/system.h"
 #include "tz_cross/ta_m4u.h"
 #endif
+
 #define M4UMSG(string, args...)	pr_warn("M4U"string, ##args)
+#define M4UINFO(string, args...)	pr_debug("M4U"string, ##args)
 
 #include "m4u_hw.h"
 
@@ -233,7 +234,7 @@ do {\
 #define M4ULOG_MID(string, args...) _M4ULOG(M4U_LOG_LEVEL_MID, string, ##args)
 #define M4ULOG_HIGH(string, args...) _M4ULOG(M4U_LOG_LEVEL_HIGH, string, ##args)
 
-#define M4UINFO(string, args...)	M4ULOG_LOW(string, ##args)
+
 #define M4UERR(string, args...) do {\
 	pr_err("M4U"string, ##args);  \
 	aee_kernel_exception("M4U", "[M4U] error:"string, ##args);  \

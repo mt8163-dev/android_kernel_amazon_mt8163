@@ -11,18 +11,11 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __M4U_DEBUG_H__
-#define __M4U_DEBUG_H__
+#ifndef M4U_SLT_H
+#define M4U_SLT_H
 
-extern unsigned long gM4U_ProtectVA;
+extern unsigned char data_argb_64x64[16384];
+/* public interface */
+int m4u_test_main(void);
 
-extern __attribute__((weak)) int ddp_mem_test(void);
-extern __attribute__((weak)) int __ddp_mem_test(unsigned int *pSrc, unsigned int pSrcPa,
-			    unsigned int *pDst, unsigned int pDstPa,
-			    int need_sync);
-
-#ifdef M4U_TEE_SERVICE_ENABLE
-extern int m4u_sec_init(void);
-extern int m4u_config_port_tee(M4U_PORT_STRUCT *pM4uPort);
-#endif
 #endif
