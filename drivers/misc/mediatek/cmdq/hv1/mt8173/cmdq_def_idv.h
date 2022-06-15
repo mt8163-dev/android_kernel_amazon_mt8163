@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 
 
 
@@ -59,9 +72,6 @@ enum CMDQ_ENG_ENUM {
 typedef enum CMDQ_CLK_ENUM {
 	CMDQ_CLK_INFRA_GCE,
 	CMDQ_CLK_DISP0_MUTEX_32K,
-	CMDQ_CLK_DISP0_SMI_COMMON,
-	CMDQ_CLK_DISP0_SMI_LARB0,
-	CMDQ_CLK_DISP0_SMI_LARB4,
 	CMDQ_CLK_DISP0_CAM_MDP,
 	CMDQ_CLK_DISP0_MDP_RDMA0,
 	CMDQ_CLK_DISP0_MDP_RDMA1,

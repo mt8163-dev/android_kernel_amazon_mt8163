@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 #ifndef __CMDQ_SEC_H__
 #define __CMDQ_SEC_H__
 #include <linux/slab.h>
@@ -111,6 +124,7 @@ void cmdqSecInitialize(void);
 void cmdqSecDeInitialize(void);
 
 int32_t cmdq_sec_sync_handle_hdcp_unlock(struct cmdqSyncHandleHdcpStruct syncHandle);
+void cmdq_sec_init_secure_path(void);
 
 
 extern struct ContextStruct gCmdqContext;

@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 #ifndef __CMDQ_DEF_H__
 #define __CMDQ_DEF_H__
 #ifdef CONFIG_OF
@@ -10,7 +23,7 @@
 #define CMDQ_GPR_SUPPORT
 
 #define CMDQ_DUMP_GIC (0)	/* TODO: enable when GIC porting done */
-#define CMDQ_PROFILE_MMP (0)
+/* #define CMDQ_PROFILE_MMP (0) */
 
 #include <linux/kernel.h>
 #include "cmdq_def_idv.h"
@@ -19,7 +32,7 @@
 #endif
 #include "cmdq_sec_iwc_common.h"
 
-#ifdef CONFIG_MTK_SMI
+#ifdef CONFIG_MTK_SMI_EXT
 /* #define CMDQ_CONFIG_SMI (1) */
 #endif
 

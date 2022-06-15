@@ -1,6 +1,19 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 #include "cmdq_platform.h"
 #include "cmdq_reg.h"
-
+#include "mt_smi.h"
 
 #include <linux/seq_file.h>
 
@@ -201,42 +214,47 @@ void cmdq_core_enable_common_clock_locked_impl(bool enable)
 {
 #ifdef CMDQ_PWR_AWARE
 	if (enable) {
-		CMDQ_LOG("[CLOCK] Enable CMDQ(GCE) Clock\n");
+		CMDQ_MSG("[CLOCK] Enable CMDQ(GCE) Clock\n");
 		cmdq_core_enable_cmdq_clock_locked_impl(enable, CMDQ_DRIVER_DEVICE_NAME);
 
-		cmdq_core_enable_mtcmos_clock(enable);
+		/* cmdq_core_enable_mtcmos_clock(enable); */
 
-		CMDQ_LOG("[CLOCK] Enable SMI & LARB0 Clock\n");
+		CMDQ_MSG("[CLOCK] Enable SMI & LARB0 Clock\n");
 /* enable_clock(MT_CG_DISP0_SMI_COMMON, "CMDQ_MDP"); */
-		cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_SMI_COMMON);
+		/* cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_SMI_COMMON); */
 /* enable_clock(MT_CG_DISP0_SMI_LARB0, "CMDQ_MDP"); */
-		cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB0);
-		cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB4);
+		/* cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB0); */
+		/* cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB4); */
 		/* m4u_larb0_enable("CMDQ_MDP"); */
 
-		CMDQ_LOG("[CLOCK] enable MT_CG_DISP0_MUTEX_32K\n");
+		mtk_smi_larb_clock_on(0, true);
+		mtk_smi_larb_clock_on(4, true);
+
+		CMDQ_MSG("[CLOCK] enable MT_CG_DISP0_MUTEX_32K\n");
 /* enable_clock(MT_CG_DISP0_MUTEX_32K, "CMDQ_MDP"); */
 		cmdq_core_enable_ccf_clk(CMDQ_CLK_DISP0_MUTEX_32K);
 	} else {
-		CMDQ_LOG("[CLOCK] Disable CMDQ(GCE) Clock\n");
-		cmdq_core_enable_cmdq_clock_locked_impl(enable, CMDQ_DRIVER_DEVICE_NAME);
-
-
-		CMDQ_LOG("[CLOCK] Disable SMI & LARB0 Clock\n");
 		/* disable, reverse the sequence */
 /* disable_clock(MT_CG_DISP0_SMI_LARB0, "CMDQ_MDP"); */
-		cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB0);
-		cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB4);
+		/* cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB0); */
+		/* cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_SMI_LARB4); */
 		/* m4u_larb0_disable("CMDQ_MDP"); */
 /* disable_clock(MT_CG_DISP0_SMI_COMMON, "CMDQ_MDP"); */
-		cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_SMI_COMMON);
+		/* cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_SMI_COMMON); */
 
-
-		CMDQ_LOG("[CLOCK] disable MT_CG_DISP0_MUTEX_32K\n");
+		CMDQ_MSG("[CLOCK] disable MT_CG_DISP0_MUTEX_32K\n");
 /* disable_clock(MT_CG_DISP0_MUTEX_32K, "CMDQ_MDP"); */
 		cmdq_core_disable_ccf_clk(CMDQ_CLK_DISP0_MUTEX_32K);
 
-		cmdq_core_enable_mtcmos_clock(enable);
+		/* cmdq_core_enable_mtcmos_clock(enable); */
+
+		CMDQ_MSG("[CLOCK] Disable SMI & LARB0 Clock\n");
+
+		mtk_smi_larb_clock_off(4, true);
+		mtk_smi_larb_clock_off(0, true);
+
+		CMDQ_MSG("[CLOCK] Disable CMDQ(GCE) Clock\n");
+		cmdq_core_enable_cmdq_clock_locked_impl(enable, CMDQ_DRIVER_DEVICE_NAME);
 	}
 #endif				/* CMDQ_PWR_AWARE */
 }

@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
@@ -17,7 +30,6 @@
 #include <linux/met_drv.h>
 #endif
 #include <linux/seq_file.h>
-#include "cmdq_fs.h"
 #include "cmdq_core.h"
 #include "cmdq_reg.h"
 #include "cmdq_struct.h"
@@ -29,7 +41,6 @@
 
 #include <linux/kthread.h>
 #include <linux/delay.h>
-#include <linux/rtpm_prio.h>
 
 
 #ifdef CMDQ_SECURE_PATH_SUPPORT
@@ -137,7 +148,7 @@ static int cmdq_core_print_log_kthread(void *data)
 	uint32_t msgOffset;
 	int32_t msgMAXSize;
 	bool needPrintLog;
-	struct sched_param param = {.sched_priority = RTPM_PRIO_SCRN_UPDATE };
+	struct sched_param param = {.sched_priority = 94};
 
 	sched_setscheduler(current, SCHED_RR, &param);
 
@@ -585,9 +596,9 @@ ssize_t cmdqCorePrintStatus(struct device *dev, struct device_attribute *attr, c
 	};
 	static const char *const listNames[] = { "Free", "Active", "Wait" };
 
-	const enum CMDQ_ENG_ENUM engines[] = { CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_ENUM) };
-	static const char *const engineNames[] = {
-	    CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_STRING) };
+	const enum CMDQ_ENG_ENUM engines[] = CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_ENUM);
+	static const char *const engineNames[] =
+	    CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_STRING);
 
 	cmdqCorePrintStatus_idv(pBuffer);
 
@@ -732,12 +743,10 @@ ssize_t cmdqCorePrintStatus(struct device *dev, struct device_attribute *attr, c
 			    value[6], value[7]);
 	} while (0);
 
-#ifdef CMDQ_DISPLAY_READY
 	/* dump display registers... */
 	length = pBuffer - buf;
 	if (length < PAGE_SIZE)
 		pBuffer += primary_display_check_path(pBuffer, (PAGE_SIZE - length));
-#endif
 
 	mutex_unlock(&gCmdqTaskMutex);
 
@@ -1058,9 +1067,9 @@ int cmdqCorePrintStatusSeq(struct seq_file *m, void *v)
 	};
 	static const char *const listNames[] = { "Free", "Active", "Wait" };
 
-	const enum CMDQ_ENG_ENUM engines[] = { CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_ENUM) };
-	static const char *const engineNames[] = {
-	    CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_STRING) };
+	const enum CMDQ_ENG_ENUM engines[] = CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_ENUM);
+	static const char *const engineNames[] =
+	    CMDQ_FOREACH_STATUS_MODULE_PRINT(GENERATE_STRING);
 
 	cmdqCorePrintStatusSeq_idv(m);
 
@@ -1196,7 +1205,6 @@ int cmdqCorePrintStatusSeq(struct seq_file *m, void *v)
 
 	cmdq_core_print_thread_seq(CMDQ_MAX_HIGH_PRIORITY_THREAD_COUNT, m);
 
-#ifdef CMDQ_DISPLAY_READY
 	/* dump display registers... */
 	do {
 		char dispStatBuf[1024] = { 0 };
@@ -1204,7 +1212,6 @@ int cmdqCorePrintStatusSeq(struct seq_file *m, void *v)
 		primary_display_check_path(dispStatBuf, sizeof(dispStatBuf));
 		seq_printf(m, dispStatBuf);
 	} while (0);
-#endif
 
 	mutex_unlock(&gCmdqTaskMutex);
 
@@ -1525,11 +1532,7 @@ int32_t cmdqCoreInitialize(void)
 	/* Reset overall context */
 	memset(&gCmdqContext, 0x0, sizeof(struct ContextStruct));
 	/* some fields has non-zero initial value */
-#ifdef CONFIG_MTK_CMDQ_HIDE_ERROR_LOGS
-	cmdq_core_set_log_level(LOG_LEVEL_MAX);	/*enable CMDQ_LOG on default */
-#else
 	cmdq_core_set_log_level(LOG_LEVEL_LOG);	/*enable CMDQ_LOG on default */
-#endif
 	cmdq_core_reset_engine_struct();
 	cmdq_core_reset_thread_struct();
 
@@ -1826,203 +1829,6 @@ static void cmdq_core_reorder_task_array(struct ThreadStruct *pThread, int32_t p
 	CMDQ_VERBOSE("WAIT: nextcookie minus %d.\n", reorderCount);
 }
 
-/* check the dma buffer addr is valid or not */
-bool cmdq_core_check_dma_addr_valid(struct TaskStruct *pTask, u32 pa)
-{
-	struct list_head *p = NULL;
-	struct WriteAddrStruct *pWriteAddr = NULL;
-	int32_t offset = 0;
-	bool is_valid = false;
-
-	if (pa % 4 != 0)
-		return false;
-
-	/* search for the entry */
-	mutex_lock(&gCmdqWriteAddrMutex);
-	list_for_each(p, &gCmdqContext.writeAddrList) {
-		pWriteAddr = list_entry(p, struct WriteAddrStruct, list_node);
-		if (NULL == pWriteAddr)
-			continue;
-
-
-		offset = pa - pWriteAddr->pa;
-
-		if (offset >= 0 &&
-			(offset / sizeof(uint32_t)) < pWriteAddr->count) {
-			is_valid = true;
-			break;
-		}
-	}
-	mutex_unlock(&gCmdqWriteAddrMutex);
-
-	if (!is_valid)
-		CMDQ_ERR("invalid dma addr:0x%x regResultsMVA:0x%x size:0x%x\n",
-			pa,
-			(u32)(pTask->regResultsMVA),
-			(u32)(pTask->regCount * sizeof(pTask->regResults[0])));
-
-	return is_valid;
-}
-
-bool cmdq_core_check_subsys_id_valid(u32 subsys_id)
-{
-	switch (subsys_id) {
-	case 1: /* 0x1400XXXX */
-	case 2: /* 0x1401XXXX */
-	case 4: /* 0x1500XXXX */
-		return true;
-	default:
-		/* check error */
-		CMDQ_ERR("subsys ID:%d check error\n", subsys_id);
-	}
-	return false;
-}
-
-bool cmdq_core_check_value_gpr_valid(u32 value_gpr)
-{
-	switch (value_gpr) {
-	case CMDQ_DATA_REG_JPEG:
-	case CMDQ_DATA_REG_PQ_COLOR:
-	case CMDQ_DATA_REG_2D_SHARPNESS_0:
-	case CMDQ_DATA_REG_2D_SHARPNESS_1:
-	case CMDQ_DATA_REG_DEBUG:
-		return true;
-	default:
-		return false;
-	}
-	return false;
-}
-
-bool cmdq_core_check_addr_gpr_valid(u32 addr_gpr)
-{
-	switch (addr_gpr) {
-	case CMDQ_DATA_REG_JPEG_DST:
-	case CMDQ_DATA_REG_PQ_COLOR_DST:
-	case CMDQ_DATA_REG_2D_SHARPNESS_0_DST:
-	case CMDQ_DATA_REG_2D_SHARPNESS_1_DST:
-	case CMDQ_DATA_REG_DEBUG_DST:
-		return true;
-	default:
-		return false;
-	}
-	return false;
-}
-
-bool cmdq_core_check_instruction_valid(struct TaskStruct *pTask,
-					u64 instruction)
-{
-	u32 op = instruction >> 56;	/* 56 ~ 63 */
-	u32 option = (instruction >> 53) & 0x7; /* 53 ~ 55 */
-	u32 argA = (instruction >> 32) & 0x001FFFFF; /* 32 ~ 52 */
-	u32 argB = instruction & 0xFFFFFFFF; /* 0 ~ 31 */
-	u32 subsys_id = argA >> 16; /* 48 ~ 52 */
-	/* u32 offset = (argA & 0xFFFF); */ /* 32 ~ 47 */
-
-
-	switch (op) {
-	case CMDQ_CODE_READ:
-		/* only allow read register value to value GPR.
-		** option = 0x2
-		** argA = subsysID + offset: subsysID should in MDP valid register base
-		** argB: GPR index = value GPR
-		*/
-		if ((option == 0x02) &&
-			cmdq_core_check_subsys_id_valid(subsys_id) &&
-			cmdq_core_check_value_gpr_valid(argB)) {
-			/* check OK */
-			return true;
-		}
-		break;
-	case CMDQ_CODE_MOVE:
-		/* only allow move dma addr(cmdq allocated) to addr GPR.
-		** option = 0x4
-		** argA = should be addr GPR
-		** argB = dma_addr
-		*/
-		if ((option == 0x04) &&
-			cmdq_core_check_addr_gpr_valid((argA >> 16) & 0x1F) &&
-			cmdq_core_check_dma_addr_valid(pTask, argB)) {
-			/* check OK */
-			return true;
-		}
-
-		/* allow mask instruction
-		** option = 0x0
-		** argA = 0
-		** argB: no limit.
-		*/
-		if ((option == 0x00) && (argA == 0)) {
-			/* check OK */
-			return true;
-		}
-
-		break;
-	case CMDQ_CODE_WRITE:
-		/* only allow write R0 to P1
-		** option == 0x06
-		** argA = addr GPR
-		** argB = value GPR
-		*/
-		if ((option == 0x06) &&
-			cmdq_core_check_value_gpr_valid(argB) &&
-			cmdq_core_check_addr_gpr_valid((argA >> 16) & 0x1F)) {
-			/* check OK */
-			return true;
-		}
-
-		/* allow write value to mdp related subsys register
-		** option = 0x0
-		** argA = subsysID + offset: subsysID should valid (mdp related subsys ID).
-		** argB: not limit.
-		*/
-		if ((option == 0x0) &&
-			cmdq_core_check_subsys_id_valid(subsys_id)) {
-			/* check OK */
-			return true;
-		}
-		break;
-	case CMDQ_CODE_JUMP:
-		/* only allow JUMP + 8
-		** argA = 0
-		** argB = 8
-		*/
-		if ((argA == 0) && (argB == 8))
-			return true;
-		break;
-	case CMDQ_CODE_POLL:
-	case CMDQ_CODE_WFE:
-	case CMDQ_CODE_EOC:
-		return true;
-	default:
-		return false;
-	}
-
-	CMDQ_ERR("check fail: op[0x%x] option[0x%x] argA[0x%x] argB[0x%x]\n", op, option, argA, argB);
-	return false;
-}
-
-
-/*
-** return true for valid. false for invalid
-*/
-bool cmdq_core_check_command_valid(struct TaskStruct *pTask, u32 *pVaBase,
-				u32 commandSize)
-{
-	u32 i = 0; /* scan inst buffer bytes */
-	u64 *pBase = (u64 *)pVaBase;
-
-	if (commandSize % 8 != 0) {
-		CMDQ_ERR("commandSize: %d not 8 align\n", commandSize);
-		return false;
-	}
-
-	for (i = 0; (i * 8) < commandSize; i++) {
-		if (!cmdq_core_check_instruction_valid(pTask, pBase[i]))
-			return false;
-	}
-	return true;
-}
-
 static int32_t cmdq_core_insert_read_reg_command(struct TaskStruct *pTask,
 						       struct cmdqCommandStruct *pCommandDesc)
 {
@@ -2168,30 +1974,6 @@ static int32_t cmdq_core_insert_read_reg_command(struct TaskStruct *pTask,
 
 	CMDQ_VERBOSE("test %d, CMDEnd=%p, base=%p, cmdSize=%d\n", __LINE__, pTask->pCMDEnd,
 		     pTask->pVABase, pTask->commandSize);
-
-	/* check instruction valid, only instr from MDP need to check. */
-	if (cmdq_core_is_request_from_user_space(pTask->scenario)) {
-		int i = 0;
-
-		if (!cmdq_core_check_command_valid(pTask, pTask->pVABase, pTask->commandSize)) {
-			CMDQ_ERR("check inst fail\n");
-			return -1;
-		}
-
-		/* check backup register addr. should only back mdp register. */
-		for (i = 0; i < pTask->regCount; i++) {
-			u32 backup_reg = CMDQ_U32_PTR(pCommandDesc->regRequest.regAddresses)[i];
-			bool is_mdp_reg = (backup_reg >= CMDQ_MDP_DUMP_REG_START) &&
-					(backup_reg < CMDQ_MDP_DUMP_REG_END);
-			bool is_cmdq_reg = (backup_reg >= CMDQ_GCE_DUMP_REG_START) &&
-					(backup_reg < CMDQ_GCE_DUMP_REG_END);
-
-			if (!is_mdp_reg && !is_cmdq_reg) {
-				CMDQ_ERR("dump invalid reg:0x%x\n", backup_reg);
-				return -1;
-			}
-		}
-	}
 
 	/* if no read request, no post-process needed. */
 	if (0 == pTask->regCount && extraBufferSize == 0)
@@ -3726,29 +3508,6 @@ void cmdq_core_dump_instructions(uint64_t *pInstrBuffer, uint32_t bufferSize)
 }
 
 
-void cmdq_core_dump_instructions_to_file(uint64_t *pInstrBuffer, uint32_t bufferSize,
-					 const char *fileName)
-{
-	uint64_t *pBuffer = pInstrBuffer;
-	char textBuffer[100];
-	int i = 0;
-	struct fs_struct fs;
-
-	init_fs_struct(&fs);
-	fs.fs_create(&fs, fileName);
-
-	while (pBuffer <= (uint64_t *) ((uint8_t *) (pInstrBuffer) + bufferSize)) {
-		memset(textBuffer, 0, 100);
-		cmdq_core_parse_instruction((uint32_t *) pBuffer, textBuffer, 99);
-		fs_printf(fs, "index:%05d,INST:0x%016llx    ----->      %s\n", i, *pBuffer,
-			  textBuffer);
-		pBuffer++;
-	}
-
-	fs.fs_close(&fs);
-}
-
-
 static void cmdq_core_fill_task_record(struct RecordStruct *pRecord, const struct TaskStruct *pTask,
 				       uint32_t thread)
 {
@@ -3939,8 +3698,7 @@ static void cmdq_core_attach_error_task(const struct TaskStruct *pTask, int32_t 
 		    ("=============== [CMDQ] Begin of Error Task[%p] trigger[%lld] Status ===============\n",
 		     pTask, pTask->trigger);
 		cmdq_core_dump_task(pTask);
-		if (pTask->pVABase)
-			cmdq_core_dump_instructions((uint64_t *) pTask->pVABase, pTask->commandSize);
+		cmdq_core_dump_instructions((uint64_t *) pTask->pVABase, pTask->commandSize);
 
 		CMDQ_ERR
 		    ("=============== [CMDQ] End of Error Task[%p] trigger[%lld] Status ===============\n",
@@ -4596,7 +4354,7 @@ static int32_t cmdq_core_handle_wait_task_result_impl(struct TaskStruct *pTask,
 		pNextTask = NULL;
 
 		/* find pTask's jump destination */
-		if (pTask->pCMDEnd && 0x10000001 == pTask->pCMDEnd[0]) {
+		if (0x10000001 == pTask->pCMDEnd[0]) {
 			pNextTask = cmdq_core_search_task_by_pc(pTask->pCMDEnd[-1], pThread);
 		} else {
 			CMDQ_MSG("No next task: LAST instruction : (0x%08x, 0x%08x)\n",
@@ -7184,6 +6942,28 @@ int cmdq_core_disable_ccf_clk(CMDQ_CLK_ENUM clk_enum)
 
 	return ret;
 }
+
+/*
+int cmdq_core_enable_mtcmos_clock(bool enable)
+{
+	int status = 0;
+#ifdef CONFIG_PM_RUNTIME
+	if (cmdq_dev_get() != NULL) {
+		if (enable)
+			status = pm_runtime_get_sync(cmdq_dev_get());
+		else
+			status = pm_runtime_put_sync(cmdq_dev_get());
+	} else {
+		CMDQ_ERR("MTCMOS fail, enable=%d cmdq_pdev=NULL\n", enable);
+		status = -1;
+	}
+#endif
+	if (status != 0)
+		CMDQ_ERR("MTCMOS fail, enable=%d status=%d\n", enable, status);
+
+	return status;
+}
+*/
 
 bool cmdq_core_clock_is_on(CMDQ_CLK_ENUM clk_enum)
 {

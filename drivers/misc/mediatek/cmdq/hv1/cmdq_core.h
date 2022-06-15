@@ -1,3 +1,16 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 #ifndef __CMDQ_CORE_H__
 #define __CMDQ_CORE_H__
 
@@ -11,9 +24,6 @@
 #include "cmdq_core_idv.h"
 #include <linux/platform_device.h>
 #include <mt-plat/aee.h>
-#ifdef CONFIG_PM_RUNTIME
-#include <linux/pm_runtime.h>
-#endif
 
 #ifdef CMDQ_SECURE_PATH_SUPPORT
 #include "cmdq_iwc_sec.h"
@@ -52,9 +62,7 @@
 		pr_err("[CMDQ][DBG]"string, ##args);	\
 	}											\
 } while (0)
-#ifdef CONFIG_MTK_AEE_FEATURE
 #define CMDQ_AEE_READY
-#endif
 #ifdef CMDQ_AEE_READY
 #define CMDQ_AEE(tag, string, args...)			\
 	do {										\
@@ -63,19 +71,11 @@
 			DB_OPT_PROC_CMDQ_INFO | DB_OPT_MMPROFILE_BUFFER, tag, "error: "string, ##args); \
 	} while (0)
 #else
-#ifdef CONFIG_MTK_CMDQ_HIDE_ERROR_LOGS
-#define CMDQ_AEE(tag, string, args...)			\
-	do {										\
-		pr_debug("[CMDQ][AEE] AEE not READY!!!"); \
-		pr_debug("[CMDQ][AEE]"string, ##args);	\
-	} while (0)
-#else
 #define CMDQ_AEE(tag, string, args...)			\
 	do {										\
 		pr_err("[CMDQ][AEE] AEE not READY!!!"); \
 		pr_err("[CMDQ][AEE]"string, ##args);	\
 	} while (0)
-#endif
 #endif
 /* #define CMDQ_PROFILE */
 
@@ -211,12 +211,6 @@ typedef unsigned long long CMDQ_TIME;
 	ACTION(CMDQ_GROUP_DISP, DISP) \
 	ACTION(CMDQ_GROUP_JPEG, JPEG) \
 	ACTION(CMDQ_GROUP_VENC, VENC)
-
-/* define backup register dump addr */
-#define CMDQ_MDP_DUMP_REG_START		0x14001000
-#define CMDQ_MDP_DUMP_REG_END   	0x14007000
-#define CMDQ_GCE_DUMP_REG_START		0x10212080
-#define CMDQ_GCE_DUMP_REG_END   	0x102120C0
 
 enum CMDQ_GROUP_ENUM {
 	CMDQ_FOREACH_GROUP(GENERATE_ENUM)
@@ -473,9 +467,7 @@ extern "C" {
 
 
 /*	extern void mt_irq_dump_status(int irq); */
-#ifdef CMDQ_DISPLAY_READY
 	extern int primary_display_check_path(char *stringbuf, int buf_len);
-#endif
 
 	int32_t cmdqCoreInitialize(void);
 
@@ -725,7 +717,7 @@ char *cmdq_core_get_clk_name(CMDQ_CLK_ENUM clk_enum);
 void cmdq_core_get_clk_map(struct platform_device *pDevice);
 int cmdq_core_enable_ccf_clk(CMDQ_CLK_ENUM clk_enum);
 int cmdq_core_disable_ccf_clk(CMDQ_CLK_ENUM clk_enum);
-int cmdq_core_enable_mtcmos_clock(bool enable);
+/* int cmdq_core_enable_mtcmos_clock(bool enable); */
 bool cmdq_core_clock_is_on(CMDQ_CLK_ENUM clk_enum);
 /*
 bool cmdq_core_subsys_is_on(CMDQ_SUBSYS_ENUM clk_enum);
@@ -739,8 +731,6 @@ int32_t cmdq_core_release_sec_metadata(struct TaskStruct *pTask);
 #if 1
 bool cmdq_core_verfiy_command_end(const struct TaskStruct *pTask);
 bool cmdq_core_verfiy_command_desc_end(struct cmdqCommandStruct *pCommandDesc);
-void cmdq_core_dump_instructions_to_file(uint64_t *pInstrBuffer, uint32_t bufferSize,
-					 const char *fileName);
 struct ThreadStruct *cmdq_core_getThreadStruct(int threadID);
 #endif
 

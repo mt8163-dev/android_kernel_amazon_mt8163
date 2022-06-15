@@ -1,10 +1,23 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
+
 #ifndef __CMDQ_CORE_H__
 #define __CMDQ_CORE_H__
 
 #include <linux/list.h>
 #include <linux/time.h>
 #ifdef CMDQ_AEE_READY
-#include <linux/aee.h>
+#include <mt-plat/aee.h>
 #endif
 #include <linux/device.h>
 #include <linux/printk.h>
@@ -26,6 +39,18 @@
 /*  */
 #define CMDQ_PHYS_TO_AREG(addr) ((addr) & 0xFFFFFFFF)	/* truncate directly */
 #define CMDQ_AREG_TO_PHYS(addr) ((addr) | 0L)
+/* Always set 33 bit to 1 under 4GB special mode */
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+#define CMDQ_GET_HIGH_ADDR(addr, highAddr) \
+{									\
+if (enable_4G())					\
+	highAddr = 0x1;					\
+else								\
+	highAddr = ((addr >> 32) & 0xffff);\
+}
+#else
+#define CMDQ_GET_HIGH_ADDR(addr, highAddr) { highAddr = 0; }
+#endif
 
 #define CMDQ_LONGSTRING_MAX (180)
 #define CMDQ_DELAY_RELEASE_RESOURCE_MS (1000)
@@ -82,8 +107,22 @@
 
 #define CMDQ_ENG_DPE_GROUP_BITS					(1LL << CMDQ_ENG_DPE)
 
+#define CMDQ_THREAD_SEC_PRIMARY_DISP	12
+#define CMDQ_THREAD_SEC_SUB_DISP		13
+#define CMDQ_THREAD_SEC_MDP				14
+
+/* max count of regs */
+#define CMDQ_MAX_COMMAND_SIZE		(0x10000)
+#define CMDQ_MAX_DUMP_REG_COUNT		(2048)
+#define CMDQ_MAX_WRITE_ADDR_COUNT	(PAGE_SIZE / sizeof(u32))
+#define CMDQ_MAX_DBG_STR_LEN		1024
+
 #ifdef CMDQ_DUMP_FIRSTERROR
+#ifdef CMDQ_LARGE_MAX_FIRSTERROR_BUFFER
+#define CMDQ_MAX_FIRSTERROR	(64*1024)
+#else
 #define CMDQ_MAX_FIRSTERROR	(32*1024)
+#endif
 typedef struct DumpFirstErrorStruct {
 	pid_t callerPid;
 	char callerName[TASK_COMM_LEN];
@@ -99,7 +138,7 @@ typedef struct DumpFirstErrorStruct {
 #define CMDQ_LOG(string, args...) \
 {			\
 if (1) {	\
-	pr_err("[CMDQ]"string, ##args); \
+	pr_notice("[CMDQ]"string, ##args); \
 	cmdq_core_save_first_dump("[CMDQ]"string, ##args); \
 }			\
 }
@@ -107,14 +146,14 @@ if (1) {	\
 #define CMDQ_MSG(string, args...) \
 {			\
 if (cmdq_core_should_print_msg()) { \
-	pr_warn("[CMDQ]"string, ##args); \
+	pr_notice("[CMDQ]"string, ##args); \
 }			\
 }
 
 #define CMDQ_VERBOSE(string, args...) \
 {			\
 if (cmdq_core_should_print_msg()) { \
-	pr_info("[CMDQ]"string, ##args); \
+	pr_debug("[CMDQ]"string, ##args); \
 }			\
 }
 
@@ -127,7 +166,7 @@ if (1) {	\
 }			\
 }
 #ifdef CMDQ_AEE_READY
-#define CMDQ_AEE(tag, string, args...) \
+#define CMDQ_AEE_EX(DB_OPTs, tag, string, args...) \
 {		\
 do {			\
 	char dispatchedTag[50]; \
@@ -135,10 +174,17 @@ do {			\
 	pr_err("[CMDQ][AEE]"string, ##args); \
 	cmdq_core_save_first_dump("[CMDQ][AEE]"string, ##args); \
 	cmdq_core_turnoff_first_dump(); \
-	aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DEFAULT | DB_OPT_PROC_CMDQ_INFO | DB_OPT_MMPROFILE_BUFFER, \
+	aee_kernel_warning_api(__FILE__, __LINE__, \
+		DB_OPT_DEFAULT | DB_OPT_PROC_CMDQ_INFO | DB_OPT_MMPROFILE_BUFFER | DB_OPTs, \
 		dispatchedTag, "error: "string, ##args); \
 } while (0);	\
 }
+
+#define CMDQ_AEE(tag, string, args...) \
+{ \
+	CMDQ_AEE_EX(DB_OPT_DUMP_DISPLAY, tag, string, ##args) \
+}
+
 #else
 #define CMDQ_AEE(tag, string, args...) \
 {		\
@@ -206,6 +252,13 @@ do_div(_duration, 1000);				\
 duration = (int32_t)_duration;			\
 }
 
+#define CMDQ_INC_TIME_IN_US(start, end, target)		\
+{		\
+CMDQ_TIME _duration = end - start;		\
+do_div(_duration, 1000);				\
+target += (int32_t)_duration;			\
+}
+
 #define CMDQ_ENG_ISP_GROUP_FLAG(flag)   ((flag) & (CMDQ_ENG_ISP_GROUP_BITS))
 
 #define CMDQ_ENG_MDP_GROUP_FLAG(flag)   ((flag) & (CMDQ_ENG_MDP_GROUP_BITS))
@@ -266,11 +319,21 @@ typedef int32_t(*CmdqDebugRegDumpBeginCB) (uint32_t taskID, uint32_t *regCount,
 					   uint32_t **regAddress);
 typedef int32_t(*CmdqDebugRegDumpEndCB) (uint32_t taskID, uint32_t regCount, uint32_t *regValues);
 
+/* dispatch module can be change by callback */
+typedef const char*(*CmdqDispatchModuleCB) (uint64_t engineFlag);
+
+struct TaskStruct;
+
+/* finished task can be get by callback */
+typedef void(*CmdqTrackTaskCB) (const struct TaskStruct *pTask);
+
 typedef struct CmdqCBkStruct {
 	CmdqClockOnCB clockOn;
 	CmdqDumpInfoCB dumpInfo;
 	CmdqResetEngCB resetEng;
 	CmdqClockOffCB clockOff;
+	CmdqDispatchModuleCB dispatchMod;
+	CmdqTrackTaskCB trackTask;
 } CmdqCBkStruct;
 
 typedef struct CmdqDebugCBkStruct {
@@ -294,7 +357,7 @@ typedef enum CMDQ_CODE_ENUM {
 	CMDQ_CODE_SET_TOKEN = 0x21,	/* set event */
 	CMDQ_CODE_WAIT_NO_CLEAR = 0x22,	/* wait event, but don't clear it */
 	CMDQ_CODE_CLEAR_TOKEN = 0x23,	/* clear event */
-	CMDQ_CODE_RAW = 0x24,	/* allow entirely custom argA/argB */
+	CMDQ_CODE_RAW = 0x24,	/* allow entirely custom arg_a/arg_b */
 	CMDQ_CODE_PREFETCH_ENABLE = 0x41,	/* enable prefetch marker */
 	CMDQ_CODE_PREFETCH_DISABLE = 0x42,	/* disable prefetch marker */
 } CMDQ_CODE_ENUM;
@@ -317,6 +380,15 @@ typedef enum TASK_STATE_ENUM {
 	TASK_STATE_DONE,	/* task finished */
 	TASK_STATE_WAITING,	/* allocated but waiting for available thread */
 } TASK_STATE_ENUM;
+
+#define CMDQ_FEATURE_OFF_VALUE (0)
+#define FOREACH_FEATURE(FEATURE) \
+FEATURE(CMDQ_FEATURE_SRAM_SHARE, "SRAM Share") \
+
+typedef enum CMDQ_FEATURE_TYPE_ENUM {
+	FOREACH_FEATURE(GENERATE_ENUM)
+	CMDQ_FEATURE_TYPE_MAX,	 /* ALWAYS keep at the end */
+} CMDQ_FEATURE_TYPE_ENUM;
 
 #ifdef CMDQ_INSTRUCTION_COUNT
 /* GCE instructions count information */
@@ -388,15 +460,25 @@ typedef struct CmdqModulePAStatStruct {
 } CmdqModulePAStatStruct;
 #endif
 
+struct CmdBufferStruct {
+	struct list_head listEntry;
+	uint32_t *pVABase;	/* virtual address of command buffer */
+	dma_addr_t MVABase;	/* physical address of command buffer */
+};
+
+struct CmdFreeWorkStruct {
+	struct list_head cmd_buffer_list;
+	struct work_struct free_buffer_work;
+};
+
 typedef struct TaskStruct {
 	struct list_head listEntry;
 
 	/* For buffer state */
 	TASK_STATE_ENUM taskState;	/* task life cycle */
-	uint32_t *pVABase;	/* virtual address of command buffer */
-	dma_addr_t MVABase;	/* physical address of command buffer */
+	struct list_head cmd_buffer_list;	/* list of allocated command buffer */
+	uint32_t buf_available_size;		/* available size for last buffer in list */
 	uint32_t bufferSize;	/* size of allocated command buffer */
-	bool useEmergencyBuf;	/* is the command buffer emergency buffer? */
 
 	/* For execution */
 	int32_t scenario;
@@ -412,7 +494,7 @@ typedef struct TaskStruct {
 	CmdqAsyncFlushCB flushCallback;	/* Callback on AsyncFlush (fire-and-forget) tasks */
 	unsigned long flushData;	/* for callbacks & error handling */
 	struct work_struct autoReleaseWork;	/* Work item when auto release is used */
-	bool useWorkQueue;
+	atomic_t useWorkQueue;
 
 	/* Output section for "read from reg to mem" */
 	uint32_t regCount;
@@ -425,6 +507,7 @@ typedef struct TaskStruct {
 
 	/* For seucre execution */
 	cmdqSecDataStruct secData;
+	struct iwcCmdqSecStatus_t *secStatus;
 
 	/* For statistics & debug */
 	CMDQ_TIME submit;	/* ASYNC: task submit time (as soon as task acquired) */
@@ -434,6 +517,10 @@ typedef struct TaskStruct {
 	CMDQ_TIME wakedUp;
 	CMDQ_TIME entrySec;	/* time stamp of entry secure world */
 	CMDQ_TIME exitSec;	/* time stamp of exit secure world */
+	uint32_t durAlloc;	/* allocae time duration */
+	uint32_t durReclaim;	/* allocae time duration */
+	uint32_t durRelease;	/* release time duration */
+	bool dumpAllocTime;	/* flag to print static info to kernel log. */
 
 	uint32_t *profileData;	/* store GPT counter when it starts and ends */
 	dma_addr_t profileDataPA;
@@ -442,6 +529,7 @@ typedef struct TaskStruct {
 
 	pid_t callerPid;
 	char callerName[TASK_COMM_LEN];
+	char *userDebugStr;
 
 	/* Custom profile marker */
 #ifdef CMDQ_PROFILE_MARKER_SUPPORT
@@ -463,8 +551,7 @@ typedef struct ThreadStruct {
 	uint64_t engineFlag;	/* keep used engine to look up while dispatch thread */
 	CmdqInterruptCB loopCallback;	/* LOOP execution */
 	unsigned long loopData;	/* LOOP execution */
-	TaskStruct *pCurTask[CMDQ_MAX_TASK_IN_THREAD];
-	struct workqueue_struct *taskThreadAutoReleaseWQ;	/* auto-release workqueue */
+	TaskStruct * pCurTask[CMDQ_MAX_TASK_IN_THREAD];
 
 	/* 1 to describe thread is available to dispatch a task. 0: not available */
 	/* .note thread's taskCount increase when attatch a task to it. */
@@ -484,7 +571,7 @@ typedef struct RecordStruct {
 	uint32_t writeTimeNS;	/* if profile enabled, the time of command execution */
 	uint64_t engineFlag;	/* task engine flag */
 
-	bool isSecure;		/* true for secure task */
+	bool is_secure;		/* true for secure task */
 
 	CMDQ_TIME submit;	/* epoch time of IOCTL/Kernel API call */
 	CMDQ_TIME trigger;	/* epoch time of enable HW thread */
@@ -492,6 +579,10 @@ typedef struct RecordStruct {
 	CMDQ_TIME gotIRQ;	/* epoch time of IRQ event */
 	CMDQ_TIME wakedUp;	/* epoch time of SW thread leaving wait state */
 	CMDQ_TIME done;		/* epoch time of task finish */
+
+	uint32_t durAlloc;	/* allocae time duration */
+	uint32_t durReclaim;	/* allocae time duration */
+	uint32_t durRelease;	/* release time duration */
 
 	unsigned long long writeTimeNSBegin;
 	unsigned long long writeTimeNSEnd;
@@ -516,6 +607,19 @@ typedef struct RecordStruct {
 #endif
 } RecordStruct;
 
+struct MemRecordStruct {
+	size_t alloc_range;		/* max size of this range */
+	uint32_t task_count;	/* how may task in this range */
+};
+
+struct MemMonitorStruct {
+	atomic_t monitor_mem_enable;
+	size_t mem_max_use;
+	size_t mem_max_phy_use;
+	size_t mem_current;
+	size_t mem_phy_current;
+};
+
 typedef struct ErrorStruct {
 	RecordStruct errorRec;	/* the record of the error task */
 	u64 ts_nsec;		/* kernel time of attach_error_task */
@@ -528,13 +632,6 @@ typedef struct WriteAddrStruct {
 	dma_addr_t pa;
 	pid_t user;
 } WriteAddrStruct;
-
-typedef struct EmergencyBufferStruct {
-	bool used;
-	uint32_t size;
-	void *va;
-	dma_addr_t pa;
-} EmergencyBufferStruct;
 
 /**
  * shared memory between normal and secure world
@@ -556,7 +653,8 @@ typedef struct ResourceUnitStruct {
 	CMDQ_TIME delay;			/* delay start time from module release*/
 	CMDQ_TIME acquire;		/* acquire time from module acquire */
 	CMDQ_TIME release;		/* release time from module release */
-	bool used;				/* indicate resource is in use or not */
+	bool used;				/* indicate resource is in use by owner or not */
+	bool lend;				/* indicate resource is lend by client or not */
 	bool delaying;			/* indicate resource is in delay check or not */
 	CMDQ_EVENT_ENUM lockEvent;	/* SW token to lock in GCE thread */
 	uint64_t engine;			/* which engine is resource */
@@ -583,6 +681,9 @@ typedef struct ContextStruct {
 	EngineStruct engine[CMDQ_MAX_ENGINE_COUNT];
 	ThreadStruct thread[CMDQ_MAX_THREAD_COUNT];
 
+	/* auto-release workqueue per thread */
+	struct workqueue_struct *taskThreadAutoReleaseWQ[CMDQ_MAX_THREAD_COUNT];
+
 	/* Secure path shared information */
 	cmdqSecSharedMemoryHandle hSecSharedMem;
 	void *hNotifyLoop;
@@ -597,6 +698,9 @@ typedef struct ContextStruct {
 	int32_t logLevel;
 	int32_t errNum;
 	ErrorStruct error[CMDQ_MAX_ERROR_COUNT];
+
+	/* feature option information */
+	uint32_t features[CMDQ_FEATURE_TYPE_MAX];
 
 	/* Resource manager information */
 	struct list_head resourceList;	/* all resource list */
@@ -626,8 +730,14 @@ extern "C" {
 				   CmdqDumpInfoCB dumpInfo,
 				   CmdqResetEngCB resetEng, CmdqClockOffCB clockOff);
 
+	int32_t cmdqCoreRegisterDispatchModCB(CMDQ_GROUP_ENUM engGroup,
+			CmdqDispatchModuleCB dispatchMod);
+
 	int32_t cmdqCoreRegisterDebugRegDumpCB(CmdqDebugRegDumpBeginCB beginCB,
 					       CmdqDebugRegDumpEndCB endCB);
+
+	int32_t cmdqCoreRegisterTrackTaskCB(CMDQ_GROUP_ENUM engGroup,
+			CmdqTrackTaskCB trackTask);
 
 	int32_t cmdqCoreSuspend(void);
 
@@ -722,13 +832,13 @@ extern "C" {
 
 
 /**
- * Helper function checking validity of a task pointer
+ * Helper function get valid task pointer
  *
  * Return:
- *     false if NOT a valid pointer
- *     true if valid
+ *     task pointer if available
  */
-	bool cmdqIsValidTaskPtr(void *pTask);
+	struct TaskStruct *cmdq_core_get_task_ptr(
+		struct TaskStruct *task_handle);
 
 /**
  * Immediately clear CMDQ event to 0 with CPU
@@ -767,9 +877,17 @@ extern "C" {
 	cmdqSecSharedMemoryHandle cmdq_core_get_secure_shared_memory(void);
 
 /*
+ * Core command buffer process
+ */
+	bool cmdq_core_task_finalize_end(struct TaskStruct *pTask);
+	bool cmdq_core_task_is_jump_inside(struct TaskStruct *pTask);
+	int32_t cmdq_core_copy_cmd_to_task_impl(struct TaskStruct *pTask, void *src,
+		const uint32_t size, const bool is_copy_from_user);
+
+/*
  * GCE capability
  */
-	uint32_t cmdq_core_subsys_to_reg_addr(uint32_t argA);
+	uint32_t cmdq_core_subsys_to_reg_addr(uint32_t arg_a);
 	const char *cmdq_core_parse_subsys_from_reg_addr(uint32_t reg_addr);
 	int32_t cmdq_core_subsys_from_phys_addr(uint32_t physAddr);
 	int32_t cmdq_core_suspend_HW_thread(int32_t thread, uint32_t lineNum);
@@ -784,12 +902,13 @@ extern "C" {
  */
 	void cmdq_core_init_DTS_data(void);
 	cmdqDTSDataStruct *cmdq_core_get_whole_DTS_Data(void);
+	uint32_t cmdq_core_get_thread_prefetch_size(int32_t thread);
 
 /**
  * Get and set HW event form device tree
  */
 	void cmdq_core_set_event_table(CMDQ_EVENT_ENUM event, const int32_t value);
-	const int32_t cmdq_core_get_event_value(CMDQ_EVENT_ENUM event);
+	int32_t cmdq_core_get_event_value(CMDQ_EVENT_ENUM event);
 	const char *cmdq_core_get_event_name_ENUM(CMDQ_EVENT_ENUM event);
 	const char *cmdq_core_get_event_name(CMDQ_EVENT_ENUM event);
 
@@ -797,6 +916,7 @@ extern "C" {
  * Utilities
  */
 	void cmdq_core_set_log_level(const int32_t value);
+	int32_t cmdq_core_get_log_level(void);
 	ssize_t cmdqCorePrintLogLevel(struct device *dev, struct device_attribute *attr, char *buf);
 	ssize_t cmdqCoreWriteLogLevel(struct device *dev,
 				      struct device_attribute *attr, const char *buf, size_t size);
@@ -806,11 +926,12 @@ extern "C" {
 	ssize_t cmdqCoreWriteProfileEnable(struct device *dev, struct device_attribute *attr,
 					   const char *buf, size_t size);
 
+	void cmdq_core_dump_tasks_info(void);
 	void cmdq_core_dump_secure_metadata(cmdqSecDataStruct *pSecData);
 	int32_t cmdqCoreDebugRegDumpBegin(uint32_t taskID, uint32_t *regCount,
 					  uint32_t **regAddress);
 	int32_t cmdqCoreDebugRegDumpEnd(uint32_t taskID, uint32_t regCount, uint32_t *regValues);
-	int32_t cmdqCoreDebugDumpCommand(TaskStruct *pTask);
+	int32_t cmdqCoreDebugDumpCommand(const TaskStruct *pTask);
 	int32_t cmdqCoreQueryUsage(int32_t *pCount);
 
 	int cmdqCorePrintRecordSeq(struct seq_file *m, void *v);
@@ -840,8 +961,6 @@ extern "C" {
 	bool cmdq_core_should_print_msg(void);
 	bool cmdq_core_should_full_error(void);
 
-	int32_t cmdq_core_enable_emergency_buffer_test(const bool enable);
-
 	int32_t cmdq_core_parse_instruction(const uint32_t *pCmd, char *textBuf, int bufLen);
 
 	void cmdq_core_add_consume_task(void);
@@ -857,6 +976,9 @@ extern "C" {
 	/* Command Buffer Dump */
 	void cmdq_core_set_command_buffer_dump(int32_t scenario, int32_t bufferSize);
 
+	/* Dump secure task status */
+	void cmdq_core_dump_secure_task_status(void);
+
 	/* test case initialization */
 	void cmdq_test_init_setting(void);
 
@@ -871,10 +993,10 @@ extern "C" {
 	int cmdqCorePrintInstructionCountSeq(struct seq_file *m, void *v);
 #endif				/* CMDQ_INSTRUCTION_COUNT */
 
-#ifdef CMDQ_DUMP_FIRSTERROR
 /**
  * Save first error dump
  */
+	void cmdq_core_turnon_first_dump(const TaskStruct *pTask);
 	void cmdq_core_turnoff_first_dump(void);
 /**
  * cmdq_core_save_first_dump - save a CMDQ first error dump to file
@@ -908,7 +1030,6 @@ extern "C" {
 */
 	void cmdq_core_save_hex_first_dump(const char *prefix_str,
 					   int rowsize, int groupsize, const void *buf, size_t len);
-#endif				/* CMDQ_DUMP_FIRSTERROR */
 
 	void cmdqCoreLockResource(uint64_t engineFlag, bool fromNotify);
 	bool cmdqCoreAcquireResource(CMDQ_EVENT_ENUM resourceEvent);
@@ -917,7 +1038,26 @@ extern "C" {
 								CmdqResourceAvailableCB resourceAvailable,
 								CmdqResourceReleaseCB resourceRelease);
 
+	void cmdq_core_dump_dts_setting(void);
+/*
+ * cmdq_core_get_running_task_by_engine_unlock
+ *
+ * Get copy of running task in hardware thread by provide engine flags.
+ * Lock gCmdqExecLock before call to protect hardware state and source task.
+ */
+	int32_t cmdq_core_get_running_task_by_engine_unlock(uint64_t engineFlag,
+		uint32_t userDebugStrLen, struct TaskStruct *p_out_task);
+	int32_t cmdq_core_get_running_task_by_engine(uint64_t engineFlag,
+		uint32_t userDebugStrLen, TaskStruct *p_out_task);
+	uint32_t cmdq_core_thread_prefetch_size(const int32_t thread);
 
+	void cmdq_core_dump_feature(void);
+	void cmdq_core_set_feature(CMDQ_FEATURE_TYPE_ENUM featureOption, uint32_t value);
+	uint32_t cmdq_core_get_feature(CMDQ_FEATURE_TYPE_ENUM featureOption);
+	bool cmdq_core_is_feature_off(CMDQ_FEATURE_TYPE_ENUM featureOption);
+	void cmdq_core_set_mem_monitor(bool enable);
+	void cmdq_core_dump_mem_monitor(void);
+	ContextStruct *cmdq_core_get_cmdqcontext(void);
 #ifdef __cplusplus
 }
 #endif
